@@ -18,7 +18,7 @@
   /* Drawer */
   .drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-width);background:var(--surface);box-shadow:2px 0 8px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .22s ease; z-index:1000;}
   .drawer.open{transform:translateX(0)}
-  .drawer .header{padding:20px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff}
+  .drawer .header{padding:60px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff}
   .drawer nav{display:flex;flex-direction:column;padding:8px}
   .drawer nav button{background:none;border:none;text-align:left;padding:12px 16px;border-radius:6px;margin:4px 8px;color:var(--text);cursor:pointer}
   .drawer nav button.active{background:rgba(0,0,0,.06)}
@@ -79,6 +79,7 @@
     <div class="header">
       <div style="font-size:18px;font-weight:700">Wuliao</div>
       <div style="font-size:12px;opacity:.9">物料管理（Web 版）</div>
+      <div style="font-size:12px;opacity:.9">hxf6276&ChatGPT</div>
     </div>
     <nav id="navlist" role="navigation" aria-label="主导航">
       <button data-page="materials" id="nav_materials" class="active">物料名称</button>
@@ -285,13 +286,14 @@
       }catch(e){ div.style.background='#CCCCCC'; }
       // click to input quantity (custom numeric keypad dialog)
       div.addEventListener('click', ()=>{
-          // Remove existing dialog if any
+          // 1. Removing existing dialog
+          // Remove any existing numeric keypad dialog to avoid duplicates
           const existingDlg = document.getElementById('numPadDialog');
           if(existingDlg) existingDlg.remove();
 
-          // Dynamically calculate keypad dialog width/height
+          // 2. Creating dialog container and styling
+          // Create the dialog container for the keypad and style it for centering and appearance
           const dlgWidth = window.innerWidth * 0.8; // 80% of viewport width
-
           const dlg = document.createElement('div');
           dlg.id = 'numPadDialog';
           dlg.style.position='fixed';
@@ -310,7 +312,8 @@
           dlg.style.width = dlgWidth + 'px';
           dlg.style.maxWidth = '95vw';
 
-          // Top title: material name
+          // 3. Adding top title (material name)
+          // Show the material name at the top of the dialog as the title
           const title = document.createElement('div');
           title.textContent = it.name;
           title.style.fontSize='20px';
@@ -318,6 +321,8 @@
           title.style.marginBottom='12px';
           dlg.appendChild(title);
 
+          // 4. Adding display area for current input
+          // Display area to show the current input number as the user types
           const display = document.createElement('div');
           display.style.fontSize='24px';
           display.style.marginBottom='12px';
@@ -326,6 +331,8 @@
 
           let currentVal = '';
 
+          // 5. Creating numeric button grid
+          // Create a grid of numeric buttons (0-9) for input
           const btnContainer = document.createElement('div');
           btnContainer.style.display='grid';
           btnContainer.style.gridTemplateColumns = `repeat(3, 1fr)`;
@@ -333,15 +340,15 @@
           btnContainer.style.marginBottom='12px';
           btnContainer.style.width = '100%';
 
-          // Updated: add negative and decimal buttons, dynamic height
-          const numbers = ['1','2','3','4','5','6','7','8','9','-','.','0'];
-          const btnHeight = Math.min(window.innerHeight/8, 80); // 1/8 viewport height, max 80px
+          const numbers = ['1','2','3','4','5','6','7','8','9','0'];
           numbers.forEach(num=>{
               const b = document.createElement('button');
               b.textContent = num;
               b.style.width = '100%';
-              b.style.height = `${btnHeight}px`;
+              b.style.height = `${window.innerHeight/6}px`;
               b.style.fontSize = '20px';
+              // 7. Button click handlers (input accumulation)
+              // Append the clicked number to the current input and update display
               b.addEventListener('click', ()=>{
                   currentVal += num;
                   display.textContent = currentVal;
@@ -351,7 +358,8 @@
 
           dlg.appendChild(btnContainer);
 
-          // Confirm and Cancel buttons at bottom, same row, each half width, green/red
+          // 6. Adding confirm and cancel buttons
+          // Add confirm (确定) and cancel (取消) buttons at the bottom of the dialog
           const btnContainerBottom = document.createElement('div');
           btnContainerBottom.style.display='flex';
           btnContainerBottom.style.width='100%';
@@ -366,6 +374,8 @@
           btnOk.style.fontSize='18px';
           btnOk.style.border='none';
           btnOk.style.borderRadius='6px';
+          // 7. Button click handlers (confirm)
+          // On confirm, validate input, add record, update UI, and close dialog
           btnOk.addEventListener('click', ()=>{
               const n = parseFloat(currentVal);
               if(isNaN(n)){ alert('请输入有效数字'); return; }
@@ -385,12 +395,15 @@
           btnCancel.style.border='none';
           btnCancel.style.borderRadius='6px';
           btnCancel.style.marginLeft='8px';
+          // 7. Button click handlers (cancel)
+          // On cancel, simply close the dialog
           btnCancel.addEventListener('click', ()=>dlg.remove());
 
           btnContainerBottom.appendChild(btnOk);
           btnContainerBottom.appendChild(btnCancel);
           dlg.appendChild(btnContainerBottom);
 
+          // Finally, add the dialog to the page
           document.body.appendChild(dlg);
       });
       // double-click to edit (rename/color/delete) - mobile may not support dblclick
