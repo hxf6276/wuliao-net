@@ -487,14 +487,21 @@
     renderMaterials();
   }
 
-  // Add new material button (append to current config)
+  // Add new material button (append to current config), check for duplicate name
   $('#btnAddMaterial').addEventListener('click', ()=>{
     const name = prompt('新建物料名称：','新物料');
     if(name===null) return;
-    const color = prompt('颜色(#RRGGBB)：','#FFFFFF');
-    if(color===null) return;
     const configs = load('wuliao_configs', {});
     const cur = load('wuliao_current', Object.keys(configs)[0]);
+    const content = configs[cur] || '';
+    // Parse current config for duplicate names
+    const items = parseConfigContent(content);
+    if(items.some(it => it.name === name.trim())){
+      alert('物料名称已存在，不能重复添加！');
+      return;
+    }
+    const color = prompt('颜色(#RRGGBB)：','#FFFFFF');
+    if(color===null) return;
     configs[cur] = (configs[cur]||'') + `${name.trim()}「」${(color.trim().startsWith('#')?color.trim():('#'+color.trim()))}\n`;
     persist('wuliao_configs', configs);
     renderMaterials();
@@ -511,14 +518,108 @@
   function renderRecords(){
     const records = load('wuliao_records', []);
     recordsTbody.innerHTML='';
-    for(const r of records){
+    records.forEach((r, idx)=>{
       const tr = document.createElement('tr');
       const td1 = document.createElement('td'); td1.textContent = r.name;
       const td2 = document.createElement('td'); td2.textContent = r.quantity;
       const td3 = document.createElement('td'); td3.textContent = r.time;
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      // Add long press (or right-click) for context menu
+      let timer = null;
+      const longPressMs = 700;
+      // Touch events for mobile
+      tr.addEventListener('touchstart', (e)=>{ timer=setTimeout(()=>{ showRecordContextMenu(idx, tr); }, longPressMs); }, {passive:true});
+      tr.addEventListener('touchend', ()=>{ if(timer) clearTimeout(timer); }, {passive:true});
+      // Mouse events for desktop
+      tr.addEventListener('mousedown', (e)=>{ if(e.button===0) timer=setTimeout(()=>{ showRecordContextMenu(idx, tr); }, longPressMs); });
+      tr.addEventListener('mouseup', ()=>{ if(timer) clearTimeout(timer); });
+      tr.addEventListener('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
+      // Also support right-click
+      tr.addEventListener('contextmenu', (e)=>{
+        e.preventDefault();
+        showRecordContextMenu(idx, tr, e);
+      });
       recordsTbody.appendChild(tr);
+    });
+  }
+
+  // Show context menu for a record row
+  function showRecordContextMenu(idx, tr, event){
+    // Remove any existing menu
+    let oldMenu = document.getElementById('recordContextMenu');
+    if(oldMenu) oldMenu.remove();
+    // Build menu
+    const menu = document.createElement('div');
+    menu.id = 'recordContextMenu';
+    menu.style.position = 'fixed';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid #ccc';
+    menu.style.borderRadius = '6px';
+    menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)';
+    menu.style.zIndex = 3000;
+    menu.style.padding = '0';
+    menu.style.minWidth = '160px';
+    menu.style.fontSize = '16px';
+    // Position menu
+    let x = 0, y = 0;
+    if(event && event.clientX !== undefined){
+      x = event.clientX;
+      y = event.clientY;
+    } else {
+      // fallback: center of row
+      const rect = tr.getBoundingClientRect();
+      x = rect.left + rect.width/2;
+      y = rect.top + rect.height/2;
     }
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    // Option: 删除当前选中行
+    const btnDel = document.createElement('div');
+    btnDel.textContent = '删除当前选中行';
+    btnDel.style.padding = '12px';
+    btnDel.style.cursor = 'pointer';
+    btnDel.addEventListener('click', ()=>{
+      let records = load('wuliao_records', []);
+      records.splice(idx, 1);
+      persist('wuliao_records', records);
+      renderRecords();
+      renderSummary();
+      menu.remove();
+    });
+    // Option: 修改当前行的数字
+    const btnEdit = document.createElement('div');
+    btnEdit.textContent = '修改当前行的数字';
+    btnEdit.style.padding = '12px';
+    btnEdit.style.cursor = 'pointer';
+    btnEdit.addEventListener('click', ()=>{
+      let records = load('wuliao_records', []);
+      let oldVal = records[idx]?.quantity;
+      let newVal = prompt('请输入新的数字：', oldVal);
+      if(newVal !== null){
+        if(isNaN(parseFloat(newVal))){
+          alert('请输入有效数字');
+        } else {
+          records[idx].quantity = parseFloat(newVal);
+          persist('wuliao_records', records);
+          renderRecords();
+          renderSummary();
+        }
+      }
+      menu.remove();
+    });
+    // Style hover
+    [btnDel, btnEdit].forEach(btn=>{
+      btn.addEventListener('mouseenter', ()=>{btn.style.background='#f5f5f5';});
+      btn.addEventListener('mouseleave', ()=>{btn.style.background='#fff';});
+    });
+    menu.appendChild(btnDel);
+    menu.appendChild(btnEdit);
+    // Remove on click outside
+    function removeMenu(e){
+      if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('mousedown', removeMenu); }
+    }
+    setTimeout(()=>{ document.addEventListener('mousedown', removeMenu); }, 0);
+    document.body.appendChild(menu);
   }
 
   // Clear records
@@ -698,33 +799,31 @@
     reader.readAsText(file, 'utf-8');
   });
 
-  // 保存当前配置到本地文件，触发浏览器保存对话框
+  // 保存当前配置到本地文件，适配移动端浏览器
   const btnSaveConfigFile = document.getElementById('btnSaveConfigFile');
   btnSaveConfigFile.addEventListener('click', ()=>{
-      const configs = load('wuliao_configs', {});
-      const cur = configSelect.value;
-      let content = configs[cur] || '';
-      let fn = cur;
-      if(!fn) fn = '配置.txt';
-      if(!fn.endsWith('.txt')) fn += '.txt';
-      
-      // 创建Blob对象
-      const blob = new Blob([content], {type:'text/plain;charset=utf-8;'});
-      
-      // 使用浏览器提供的下载方式触发保存对话框
-      if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-          // for IE
-          window.navigator.msSaveOrOpenBlob(blob, fn);
-      } else {
-          const a = document.createElement('a');
-          const url = URL.createObjectURL(blob);
-          a.href = url;
-          a.download = fn;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+      // 1. 获取 textarea 的内容
+      const content = configText.value;
+      // 2. 获取文件名（下拉框选中项），默认 config.txt
+      let fn = configSelect.value;
+      if (!fn || typeof fn !== 'string' || fn.trim() === '') {
+        fn = 'config.txt';
       }
+      if (!fn.endsWith('.txt')) fn += '.txt';
+      // 3. 创建 Blob
+      const blob = new Blob([content], {type:'text/plain;charset=utf-8;'});
+      // 4. 创建临时 a 元素
+      const a = document.createElement('a');
+      // 5. 设置 href 和 download
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = fn;
+      // 6. 触发下载
+      document.body.appendChild(a);
+      a.click();
+      // 7. 清理
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
   });
   </script>
 </body>
