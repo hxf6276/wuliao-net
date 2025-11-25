@@ -176,7 +176,7 @@
 
       // Only fetch from repository if default.txt is not already in localStorage
       if(!configs['default.txt']){
-        fetch(window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + 'configs/default.txt')
+        fetch('configs/default.txt')
           .then(resp => resp.text())
           .then(text => {
             configs['default.txt'] = text;
