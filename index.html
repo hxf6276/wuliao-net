@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wuliao — 物料管理</title>
+<style>
+  :root{
+    --primary:#1976d2;
+    --surface:#ffffff;
+    --muted:#f5f5f5;
+    --accent:#ffb300;
+    --text:#222;
+    --drawer-width:280px;
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:var(--text);}
+  .app{display:flex;height:100vh;overflow:hidden;}
+  /* Drawer */
+  .drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-width);background:var(--surface);box-shadow:2px 0 8px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .22s ease;z-index:30}
+  .drawer.open{transform:translateX(0)}
+  .drawer .header{padding:20px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff}
+  .drawer nav{display:flex;flex-direction:column;padding:8px}
+  .drawer nav button{background:none;border:none;text-align:left;padding:12px 16px;border-radius:6px;margin:4px 8px;color:var(--text);cursor:pointer}
+  .drawer nav button.active{background:rgba(0,0,0,.06)}
+  /* overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);opacity:0;visibility:hidden;transition:opacity .2s;z-index:20}
+  .overlay.show{opacity:1;visibility:visible}
+  /* top bar */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{display:flex;align-items:center;padding:10px 12px;background:var(--primary);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .hamburger{width:36px;height:36px;border-radius:6px;background:transparent;border:none;color:white;font-size:20px;margin-right:8px;cursor:pointer}
+  .title{font-weight:600;font-size:18px}
+  /* content area */
+  .content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--muted)}
+  .page{flex:1;overflow:auto;padding:12px}
+  /* Materials grid */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+  }
+  .grid .item{
+    min-height:64px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:8px;
+    color:#000;
+    font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);
+    cursor:pointer;
+  }
+  .grid .item.small{font-size:14px}
+  /* .add-fixed{position:sticky;bottom:12px;margin-top:12px} */
+  .btn{display:inline-block;padding:10px 14px;border-radius:8px;background:#eee;border:none;cursor:pointer}
+  /* Records table */
+  .table{width:100%;border-collapse:collapse}
+  .table thead td{font-weight:700;padding:8px;background:#fff;border-bottom:1px solid #ddd}
+  .table tbody tr td{padding:8px;background:#fff;border-bottom:1px solid #eee}
+  /* Summary */
+  .summary-row{display:flex;align-items:center;padding:8px;background:#fff;margin-bottom:6px;border-radius:6px}
+  .summary-row .name{flex:1}
+  .summary-row .value{width:120px;text-align:center;font-weight:700}
+  /* Config */
+  .config-top{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .config-top select{flex:3;padding:8px;border-radius:6px;border:1px solid #ccc}
+  .config-top button{flex:1;padding:8px;border-radius:6px}
+  textarea#configText{width:100%;height:60vh;padding:10px;border-radius:8px;border:1px solid #ddd;resize:vertical;background:#fff}
+  /* small screens adjustments */
+</style>
+#page_materials { padding-bottom:140px !important; }
+#page_records { padding-bottom:80px !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Drawer -->
+  <div id="drawer" class="drawer" aria-hidden="true">
+    <div class="header">
+      <div style="font-size:18px;font-weight:700">Wuliao</div>
+      <div style="font-size:12px;opacity:.9">物料管理（Web 版）</div>
+    </div>
+    <nav id="navlist" role="navigation" aria-label="主导航">
+      <button data-page="materials" id="nav_materials" class="active">物料名称</button>
+      <button data-page="records" id="nav_records">记录区</button>
+      <button data-page="summary" id="nav_summary">汇总记录</button>
+      <button data-page="config" id="nav_config">配置</button>
+    </nav>
+  </div>
+
+  <!-- overlay -->
+  <div id="overlay" class="overlay"></div>
+
+  <!-- main -->
+  <div class="main">
+    <div class="topbar">
+      <button id="hamburger" class="hamburger" aria-label="打开菜单">☰</button>
+      <div class="title">物料管理</div>
+    </div>
+
+    <div class="content">
+      <!-- Materials Page -->
+      <section id="page_materials" class="page" aria-hidden="false">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700">物料按钮面板</div>
+          <div style="font-size:12px;color:#555">每行 3 个，长按暂以双击替代（移动端长触）</div>
+        </div>
+        <div id="materialsGrid" class="grid" aria-live="polite"></div>
+        <div style="height:60px;"></div>
+        <div id="materialsFixedBar" style="position:fixed; bottom:0; left:0; width:100%; background:#fff; border-top:1px solid #ddd; padding:12px; z-index:50;">
+            <button id="btnAddMaterial" class="btn" style="width:100%;">+ 新增按钮</button>
+        </div>
+      </section>
+
+      <!-- Records Page -->
+      <section id="page_records" class="page" aria-hidden="true" style="display:none">
+        <div style="font-weight:700;margin-bottom:8px">操作记录</div>
+        <div id="recordsArea">
+          <table class="table" aria-describedby="记录表">
+            <thead><tr><td>物料名称</td><td>数量</td><td>时间</td></tr></thead>
+            <tbody id="recordsTbody"></tbody>
+          </table>
+          <div id="recordsFixedBar" style="position:fixed; bottom:0; left:0; width:100%; display:flex; background:#fff; border-top:1px solid #ddd; padding:8px 0; z-index:50;">
+              <button id="btnClearRecords" class="btn" style="width:50%;">清空当前记录</button>
+              <button id="btnExportRecords" class="btn" style="width:50%;">导出为CSV</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Summary Page -->
+      <section id="page_summary" class="page" aria-hidden="true" style="display:none">
+        <div style="font-weight:700;margin-bottom:8px">汇总记录</div>
+        <div id="summaryArea"></div>
+      </section>
+
+      <!-- Config Page -->
+      <section id="page_config" class="page" aria-hidden="true" style="display:none">
+        <div style="font-weight:700;margin-bottom:8px">配置文件</div>
+        <div class="config-top">
+          <select id="configSelect" aria-label="配置文件列表"></select>
+          <button id="btnNewConfig" class="btn">新增配置</button>
+        </div>
+        <textarea id="configText" placeholder="配置文件内容：每行 格式为：物料名称「」#RRGGBB"></textarea>
+        <div style="margin-top:8px;font-size:12px;color:#666">示例行：螺丝「」#FFCDD2</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- Dialogs (simple prompt polyfill) -->
+<script>
+/*
+  Wuliao Web App
+  - 使用 localStorage 保存：
+    key: wuliao_configs -> { filename: contentString, ... }
+    key: wuliao_current -> filename
+    key: wuliao_records -> [ {name, quantity, time}, ... ]
+*/
+(function(){
+  // Utilities
+  function $(sel, ctx){ return (ctx||document).querySelector(sel); }
+  function $all(sel, ctx){ return Array.from((ctx||document).querySelectorAll(sel)); }
+  function nowTime(){ const d=new Date(); return d.toTimeString().split(' ')[0]; }
+  function persist(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+  function load(key, fallback){ try{ const s=localStorage.getItem(key); return s?JSON.parse(s):fallback; }catch(e){return fallback;} }
+  function ensureDefaultConfigs(){
+    let configs = load('wuliao_configs', null);
+    if(!configs){
+      configs = {
+        "default.txt":"物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n"
+      };
+      persist('wuliao_configs', configs);
+      persist('wuliao_current', 'default.txt');
+    } else {
+      if(!Object.keys(configs).length){
+        configs["default.txt"]="物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
+        persist('wuliao_configs', configs);
+        persist('wuliao_current', 'default.txt');
+      }
+      if(!load('wuliao_current', null)){
+        persist('wuliao_current', Object.keys(configs)[0]);
+      }
+    }
+    // ensure records exists
+    if(!localStorage.getItem('wuliao_records')){
+      persist('wuliao_records', []);
+    }
+  }
+
+  // UI elements
+  const drawer = $('#drawer'), overlay = $('#overlay'), hamburger=$('#hamburger');
+  const navButtons = $all('#navlist button');
+  const pages = {
+    materials: $('#page_materials'),
+    records: $('#page_records'),
+    summary: $('#page_summary'),
+    config: $('#page_config')
+  };
+  const materialsGrid = $('#materialsGrid');
+  const btnAddMaterial = $('#btnAddMaterial');
+  const recordsTbody = $('#recordsTbody');
+  const summaryArea = $('#summaryArea');
+  const configSelect = $('#configSelect');
+  const configText = $('#configText');
+  const btnNewConfig = $('#btnNewConfig');
+
+  // Drawer control
+  function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('show'); drawer.setAttribute('aria-hidden','false'); }
+  function closeDrawer(){ drawer.classList.remove('open'); overlay.classList.remove('show'); drawer.setAttribute('aria-hidden','true'); }
+  hamburger.addEventListener('click', ()=>{ openDrawer(); });
+  overlay.addEventListener('click', ()=> closeDrawer());
+  // nav switching
+  navButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      navButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const page = btn.getAttribute('data-page');
+      showPage(page);
+      closeDrawer();
+    });
+  });
+
+  // Show page
+  function showPage(name){
+    Object.keys(pages).forEach(k=>{
+      if(k===name){ pages[k].style.display='block'; pages[k].setAttribute('aria-hidden','false'); }
+      else{ pages[k].style.display='none'; pages[k].setAttribute('aria-hidden','true'); }
+    });
+    // refresh when necessary
+    if(name==='materials') renderMaterials();
+    if(name==='records') renderRecords();
+    if(name==='summary') renderSummary();
+    if(name==='config') renderConfigEditor();
+  }
+
+  // Parse config lines to array of {name,color}
+  function parseConfigContent(content){
+    const lines = (content||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const items=[];
+    for(const line of lines){
+      // Accept both "「」" and plain "#" split fallback
+      if(line.indexOf('「」')>-1){
+        const parts = line.split('「」');
+        if(parts.length>=2){
+          items.push({name:parts[0].trim(),color:parts.slice(1).join('「」').trim()});
+        }
+      } else {
+        // try split by last space or by '#'
+        const idx = line.lastIndexOf('#');
+        if(idx>-1){
+          const name = line.slice(0, idx).trim();
+          const color = '#'+line.slice(idx+1).trim().replace(/^#+/,'');
+          items.push({name:name||'无名', color: color});
+        } else {
+          // fallback: name only
+          items.push({name:line, color:'#CCCCCC'});
+        }
+      }
+    }
+    return items;
+  }
+
+  // Render materials grid
+  function renderMaterials(){
+    materialsGrid.innerHTML='';
+    const configs = load('wuliao_configs', {});
+    const cur = load('wuliao_current', Object.keys(configs)[0]);
+    const content = configs[cur] || '';
+    const items = parseConfigContent(content);
+    // create buttons 3 per row via CSS flex wrap
+    items.forEach((it, idx)=>{
+      const div = document.createElement('div');
+      div.className='item';
+      div.textContent = it.name;
+      // safe color parse
+      try{
+        let c = it.color||'#CCCCCC';
+        if(!c.startsWith('#')) c = '#'+c;
+        // simple validation: #RRGGBB or #AARRGGBB
+        if(/^#[0-9A-Fa-f]{6}$/.test(c) || /^#[0-9A-Fa-f]{8}$/.test(c)){
+          div.style.background = c;
+        } else {
+          div.style.background = '#CCCCCC';
+        }
+      }catch(e){ div.style.background='#CCCCCC'; }
+      // click to input quantity
+      div.addEventListener('click', ()=>{
+        const q = prompt('输入数量（整数）', '1');
+        if(q===null) return;
+        const n = parseInt(q,10);
+        if(isNaN(n)) { alert('请输入整数'); return; }
+        addRecord(it.name, n);
+        // automatic switch to records?
+        // showPage('records'); // optional
+        renderRecords(); renderSummary();
+      });
+      // double-click to edit (rename/color/delete) - mobile may not support dblclick
+      div.addEventListener('dblclick', ()=>{
+        editMaterialDialog(it, idx);
+      });
+      // for mobile consider long-touch via context menu prevention - provide hold by longpress detection
+      addLongPress(div, ()=>{ editMaterialDialog(it, idx); });
+      materialsGrid.appendChild(div);
+    });
+
+    // ensure grid fills place (CSS handles)
+  }
+
+  // Long press helper (for mobile)
+  function addLongPress(el, callback, ms=700){
+    let timer=null;
+    el.addEventListener('touchstart', (e)=>{ timer=setTimeout(()=>{ callback(); }, ms); }, {passive:true});
+    el.addEventListener('touchend', ()=>{ if(timer) clearTimeout(timer); }, {passive:true});
+    el.addEventListener('mousedown', ()=>{ timer=setTimeout(()=>{ callback(); }, ms); });
+    el.addEventListener('mouseup', ()=>{ if(timer) clearTimeout(timer); });
+    el.addEventListener('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
+  }
+
+  // Edit material dialog: rename / change color / delete
+  function editMaterialDialog(item, index){
+    const configs = load('wuliao_configs', {});
+    const cur = load('wuliao_current', Object.keys(configs)[0]);
+    const content = configs[cur] || '';
+    const items = parseConfigContent(content);
+    if(!items[index]) { alert('物料不存在'); return; }
+    const name = prompt('修改物料名称：', items[index].name);
+    if(name===null) return;
+    const color = prompt('修改颜色（#RRGGBB）：', items[index].color||'#FFFFFF');
+    if(color===null) return;
+    // ask delete?
+    const del = confirm('要删除该按钮吗？点确定删除，否则保存修改。');
+    if(del){
+      items.splice(index,1);
+    } else {
+      items[index].name = name.trim()||items[index].name;
+      items[index].color = (color.trim().startsWith('#')?color.trim():('#'+color.trim()));
+    }
+    // rebuild content
+    const newContent = items.map(it=>`${it.name}「」${it.color}`).join('\n') + '\n';
+    configs[cur] = newContent;
+    persist('wuliao_configs', configs);
+    renderMaterials();
+  }
+
+  // Add new material button (append to current config)
+  $('#btnAddMaterial').addEventListener('click', ()=>{
+    const name = prompt('新建物料名称：','新物料');
+    if(name===null) return;
+    const color = prompt('颜色(#RRGGBB)：','#FFFFFF');
+    if(color===null) return;
+    const configs = load('wuliao_configs', {});
+    const cur = load('wuliao_current', Object.keys(configs)[0]);
+    configs[cur] = (configs[cur]||'') + `${name.trim()}「」${(color.trim().startsWith('#')?color.trim():('#'+color.trim()))}\n`;
+    persist('wuliao_configs', configs);
+    renderMaterials();
+  });
+
+  // Records handling
+  function addRecord(name, quantity){
+    const records = load('wuliao_records', []);
+    records.unshift({name, quantity, time: nowTime()});
+    persist('wuliao_records', records);
+    // also update summary will be done on render
+  }
+
+  function renderRecords(){
+    const records = load('wuliao_records', []);
+    recordsTbody.innerHTML='';
+    for(const r of records){
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = r.name;
+      const td2 = document.createElement('td'); td2.textContent = r.quantity;
+      const td3 = document.createElement('td'); td3.textContent = r.time;
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      recordsTbody.appendChild(tr);
+    }
+  }
+
+  // Clear records
+  $('#btnClearRecords')?.addEventListener('click', ()=>{
+    if(!confirm('确定要清空所有记录吗？')) return;
+    persist('wuliao_records', []);
+    renderRecords();
+    renderSummary();
+  });
+
+  // Export records as CSV
+  $('#btnExportRecords')?.addEventListener('click', ()=>{
+    const records = load('wuliao_records', []);
+    if(records.length === 0){
+      alert('当前没有记录可导出');
+      return;
+    }
+    let csv = '物料名称,数量,时间\n';
+    records.forEach(r=>{
+      csv += `${r.name},${r.quantity},${r.time}\n`;
+    });
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '记录导出.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Summary
+  function renderSummary(){
+    const records = load('wuliao_records', []);
+    const map = {};
+    for(const r of records){
+      map[r.name] = (map[r.name]||0) + Number(r.quantity);
+    }
+    summaryArea.innerHTML='';
+    for(const k of Object.keys(map)){
+      const div = document.createElement('div');
+      div.className='summary-row';
+      const nameDiv = document.createElement('div'); nameDiv.className='name'; nameDiv.textContent = k;
+      const valDiv = document.createElement('div'); valDiv.className='value'; valDiv.textContent = map[k];
+      div.appendChild(nameDiv); div.appendChild(valDiv);
+      summaryArea.appendChild(div);
+    }
+  }
+
+  // Config editor UI
+  function renderConfigEditor(){
+    const configs = load('wuliao_configs', {});
+    configSelect.innerHTML='';
+    Object.keys(configs).forEach(fn=>{
+      const o = document.createElement('option'); o.value=fn; o.textContent=fn; configSelect.appendChild(o);
+    });
+    const current = load('wuliao_current', Object.keys(configs)[0]);
+    if(current && configSelect.querySelector(`option[value="${current}"]`)){
+      configSelect.value = current;
+    } else {
+      configSelect.selectedIndex = 0;
+      persist('wuliao_current', configSelect.value);
+    }
+    loadConfigTextToEditor();
+  }
+
+  function loadConfigTextToEditor(){
+    const configs = load('wuliao_configs', {});
+    const cur = configSelect.value;
+    configText.value = configs[cur] || '';
+  }
+
+  // Save editor to storage
+  function saveEditorToConfig(){
+    const configs = load('wuliao_configs', {});
+    const cur = configSelect.value;
+    configs[cur] = configText.value;
+    persist('wuliao_configs', configs);
+    // live update: re-render materials
+    renderMaterials();
+  }
+
+  // New config
+  btnNewConfig.addEventListener('click', ()=>{
+    const name = prompt('新配置文件名（含或不含 .txt）：','newconfig.txt');
+    if(!name) return;
+    let fn = name.trim();
+    if(!fn.endsWith('.txt')) fn += '.txt';
+    const configs = load('wuliao_configs', {});
+    if(configs[fn]){
+      alert('文件已存在');
+      return;
+    }
+    configs[fn]='';
+    persist('wuliao_configs', configs);
+    persist('wuliao_current', fn);
+    renderConfigEditor();
+    // open editor focus
+    configText.focus();
+  });
+
+  // Bind config select change
+  configSelect.addEventListener('change', ()=>{
+    persist('wuliao_current', configSelect.value);
+    loadConfigTextToEditor();
+  });
+
+  // Debounced save
+  let saveTimer = null;
+  configText.addEventListener('input', ()=>{
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{
+      saveEditorToConfig();
+    }, 500);
+  });
+
+  // initialize
+  ensureDefaultConfigs();
+  renderMaterials();
+  renderRecords();
+  renderSummary();
+  renderConfigEditor();
+
+  // start at materials
+  showPage('materials');
+
+  // keyboard accessibility (Esc to close drawer)
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape') closeDrawer();
+  });
+
+  // helpful: expose some functions for dev console
+  window.Wuliao = {
+    load: load, persist: persist, addRecord: addRecord, renderMaterials, renderRecords, renderSummary
+  };
+})();
+</script>
+</body>
+</html>
