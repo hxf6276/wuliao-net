@@ -16,14 +16,14 @@
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:var(--text);}
   .app{display:flex;height:100vh;overflow:hidden;}
   /* Drawer */
-  .drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-width);background:var(--surface);box-shadow:2px 0 8px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .22s ease;z-index:30}
+  .drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-width);background:var(--surface);box-shadow:2px 0 8px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .22s ease; z-index:1000;}
   .drawer.open{transform:translateX(0)}
   .drawer .header{padding:20px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff}
   .drawer nav{display:flex;flex-direction:column;padding:8px}
   .drawer nav button{background:none;border:none;text-align:left;padding:12px 16px;border-radius:6px;margin:4px 8px;color:var(--text);cursor:pointer}
   .drawer nav button.active{background:rgba(0,0,0,.06)}
   /* overlay */
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);opacity:0;visibility:hidden;transition:opacity .2s;z-index:20}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);opacity:0;visibility:hidden;transition:opacity .2s; z-index:900;}
   .overlay.show{opacity:1;visibility:visible}
   /* top bar */
   .main{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -69,8 +69,7 @@
   textarea#configText{width:100%;height:60vh;padding:10px;border-radius:8px;border:1px solid #ddd;resize:vertical;background:#fff}
   /* small screens adjustments */
 </style>
-#page_materials { padding-bottom:140px !important; }
-#page_records { padding-bottom:80px !important; }
+
 </style>
 </head>
 <body>
@@ -284,16 +283,115 @@
           div.style.background = '#CCCCCC';
         }
       }catch(e){ div.style.background='#CCCCCC'; }
-      // click to input quantity
+      // click to input quantity (custom numeric keypad dialog)
       div.addEventListener('click', ()=>{
-        const q = prompt('输入数量（整数）', '1');
-        if(q===null) return;
-        const n = parseInt(q,10);
-        if(isNaN(n)) { alert('请输入整数'); return; }
-        addRecord(it.name, n);
-        // automatic switch to records?
-        // showPage('records'); // optional
-        renderRecords(); renderSummary();
+          // Remove existing dialog if any
+          const existingDlg = document.getElementById('numPadDialog');
+          if(existingDlg) existingDlg.remove();
+
+          // Dynamically calculate keypad dialog width/height
+          const dlgWidth = window.innerWidth * 0.8; // 80% of viewport width
+
+          const dlg = document.createElement('div');
+          dlg.id = 'numPadDialog';
+          dlg.style.position='fixed';
+          dlg.style.top='50%';
+          dlg.style.left='50%';
+          dlg.style.transform='translate(-50%,-50%)';
+          dlg.style.background='#fff';
+          dlg.style.padding='16px';
+          dlg.style.border='1px solid #ccc';
+          dlg.style.borderRadius='8px';
+          dlg.style.zIndex=2000;
+          dlg.style.boxShadow='0 2px 8px rgba(0,0,0,0.3)';
+          dlg.style.display='flex';
+          dlg.style.flexDirection='column';
+          dlg.style.alignItems='center';
+          dlg.style.width = dlgWidth + 'px';
+          dlg.style.maxWidth = '95vw';
+
+          // Top title: material name
+          const title = document.createElement('div');
+          title.textContent = it.name;
+          title.style.fontSize='20px';
+          title.style.fontWeight='700';
+          title.style.marginBottom='12px';
+          dlg.appendChild(title);
+
+          const display = document.createElement('div');
+          display.style.fontSize='24px';
+          display.style.marginBottom='12px';
+          display.textContent = '0';
+          dlg.appendChild(display);
+
+          let currentVal = '';
+
+          const btnContainer = document.createElement('div');
+          btnContainer.style.display='grid';
+          btnContainer.style.gridTemplateColumns = `repeat(3, 1fr)`;
+          btnContainer.style.gridGap='8px';
+          btnContainer.style.marginBottom='12px';
+          btnContainer.style.width = '100%';
+
+          // Updated: add negative and decimal buttons, dynamic height
+          const numbers = ['1','2','3','4','5','6','7','8','9','-','.','0'];
+          const btnHeight = Math.min(window.innerHeight/8, 80); // 1/8 viewport height, max 80px
+          numbers.forEach(num=>{
+              const b = document.createElement('button');
+              b.textContent = num;
+              b.style.width = '100%';
+              b.style.height = `${btnHeight}px`;
+              b.style.fontSize = '20px';
+              b.addEventListener('click', ()=>{
+                  currentVal += num;
+                  display.textContent = currentVal;
+              });
+              btnContainer.appendChild(b);
+          });
+
+          dlg.appendChild(btnContainer);
+
+          // Confirm and Cancel buttons at bottom, same row, each half width, green/red
+          const btnContainerBottom = document.createElement('div');
+          btnContainerBottom.style.display='flex';
+          btnContainerBottom.style.width='100%';
+          btnContainerBottom.style.marginTop='8px';
+
+          const btnOk = document.createElement('button');
+          btnOk.textContent='确定';
+          btnOk.style.flex='1';
+          btnOk.style.backgroundColor='#4CAF50';
+          btnOk.style.color='#fff';
+          btnOk.style.padding='12px';
+          btnOk.style.fontSize='18px';
+          btnOk.style.border='none';
+          btnOk.style.borderRadius='6px';
+          btnOk.addEventListener('click', ()=>{
+              const n = parseFloat(currentVal);
+              if(isNaN(n)){ alert('请输入有效数字'); return; }
+              addRecord(it.name,n);
+              renderRecords();
+              renderSummary();
+              dlg.remove();
+          });
+
+          const btnCancel = document.createElement('button');
+          btnCancel.textContent='取消';
+          btnCancel.style.flex='1';
+          btnCancel.style.backgroundColor='#F44336';
+          btnCancel.style.color='#fff';
+          btnCancel.style.padding='12px';
+          btnCancel.style.fontSize='18px';
+          btnCancel.style.border='none';
+          btnCancel.style.borderRadius='6px';
+          btnCancel.style.marginLeft='8px';
+          btnCancel.addEventListener('click', ()=>dlg.remove());
+
+          btnContainerBottom.appendChild(btnOk);
+          btnContainerBottom.appendChild(btnCancel);
+          dlg.appendChild(btnContainerBottom);
+
+          document.body.appendChild(dlg);
       });
       // double-click to edit (rename/color/delete) - mobile may not support dblclick
       div.addEventListener('dblclick', ()=>{
@@ -515,3 +613,6 @@
 </script>
 </body>
 </html>
+  /* Content and bottom bar z-index */
+  #materialsFixedBar, #recordsFixedBar { z-index:50; }
+  .grid .item, .btn, .table, #summaryArea { z-index:50; }
