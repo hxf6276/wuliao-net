@@ -172,44 +172,47 @@
         persist('wuliao_configs', configs);
       }
 
-      const current = load('wuliao_current', null) || 'default.txt';
-      persist('wuliao_current', current);
+      // 当前选中配置，默认空
+      let current = load('wuliao_current', null);
 
-      // 如果 localStorage 中没有 default.txt，则从 GitHub 仓库获取
-      if(!configs['default.txt']){
-          fetch('https://raw.githubusercontent.com/hxf6276.github.io/wuliao-net/configs/default.txt')
-            .then(resp => {
-                if(!resp.ok) throw new Error('GitHub 文件获取失败');
-                return resp.text();
-            })
-            .then(text => {
-                // 保存到 localStorage，用户在本地可编辑
-                configs['default.txt'] = text;
-                persist('wuliao_configs', configs);
-                renderMaterials();
-                renderConfigEditor();
+      // 尝试从 GitHub 获取网络配置文件
+      fetch('https://raw.githubusercontent.com/hxf6276/wuliao-web/main/configs/default.txt')
+        .then(resp=>{
+            if(!resp.ok) throw new Error('GitHub 文件获取失败');
+            return resp.text();
+        })
+        .then(text=>{
+            // 成功获取则保存为“网络配置文件”
+            configs['网络配置文件'] = text;
+            persist('wuliao_configs', configs);
+            persist('wuliao_current', '网络配置文件');
+            renderMaterials();
+            renderConfigEditor();
 
-                // 显示提示
-                const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
-                if(configTitleDiv){
-                    let notifyInline = document.createElement('span');
-                    notifyInline.textContent = ' （默认配置文件已加载到本地）';
-                    notifyInline.style.color = '#4CAF50';
-                    notifyInline.style.fontSize = '14px';
-                    notifyInline.style.fontWeight = 'normal';
-                    configTitleDiv.appendChild(notifyInline);
-                    setTimeout(()=>{ notifyInline.remove(); }, 3000);
-                }
-            })
-            .catch(err=>{
-                console.error('读取 GitHub 默认配置失败', err);
-                // 如果获取失败，使用内置默认内容
+            // 提示加载成功
+            const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
+            if(configTitleDiv){
+                let notifyInline = document.createElement('span');
+                notifyInline.textContent = ' （已加载网络配置文件）';
+                notifyInline.style.color = '#4CAF50';
+                notifyInline.style.fontSize = '14px';
+                notifyInline.style.fontWeight = 'normal';
+                configTitleDiv.appendChild(notifyInline);
+                setTimeout(()=>{ notifyInline.remove(); }, 3000);
+            }
+        })
+        .catch(err=>{
+            console.error('读取 GitHub 默认配置失败', err);
+            // 失败则使用本地默认配置，普通配置文件名可以是"default.txt"
+            if(!configs['default.txt']){
                 configs['default.txt'] = "物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
                 persist('wuliao_configs', configs);
-                renderMaterials();
-                renderConfigEditor();
-            });
-      }
+            }
+            // 设置当前配置为已有配置或默认
+            persist('wuliao_current', Object.keys(configs)[0]);
+            renderMaterials();
+            renderConfigEditor();
+        });
 
       // 确保记录数组存在
       if(!localStorage.getItem('wuliao_records')){
@@ -569,10 +572,20 @@
   function renderConfigEditor(){
     const configs = load('wuliao_configs', {});
     configSelect.innerHTML='';
-    Object.keys(configs).forEach(fn=>{
+    // "网络配置文件" 作为第一个选项, 其余用户自建的配置按名称排序
+    const allKeys = Object.keys(configs);
+    const netKey = '网络配置文件';
+    let keys = [];
+    if (allKeys.includes(netKey)) {
+      keys.push(netKey);
+    }
+    // 过滤掉网络配置文件的其他用户自建配置
+    keys = keys.concat(allKeys.filter(k => k !== netKey));
+    keys.forEach(fn=>{
       const o = document.createElement('option'); o.value=fn; o.textContent=fn; configSelect.appendChild(o);
     });
-    const current = load('wuliao_current', Object.keys(configs)[0]);
+    // 当前选中项
+    const current = load('wuliao_current', keys[0]);
     if(current && configSelect.querySelector(`option[value="${current}"]`)){
       configSelect.value = current;
     } else {
@@ -655,6 +668,3 @@
 </script>
 </body>
 </html>
-  /* Content and bottom bar z-index */
-  #materialsFixedBar, #recordsFixedBar { z-index:50; }
-  .grid .item, .btn, .table, #summaryArea { z-index:50; }
