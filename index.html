@@ -139,10 +139,15 @@
         <div style="font-weight:700;margin-bottom:8px">配置文件</div>
         <div class="config-top">
           <select id="configSelect" aria-label="配置文件列表"></select>
+          <input type="file" id="configFileInput" accept=".txt,.json,.conf,.cfg,.ini,.yaml,.yml,.csv,.conf,.ini,.xml,.html,.htm,.js,.py,.md,.log,.bat,.sh,.tsv" style="display:none" />
+          <button id="btnChooseFile" class="btn">本地配置</button>
           <button id="btnNewConfig" class="btn">新增配置</button>
         </div>
         <textarea id="configText" placeholder="配置文件内容：每行 格式为：物料名称「」#RRGGBB"></textarea>
         <div style="margin-top:8px;font-size:12px;color:#666">示例行：螺丝「」#FFCDD2</div>
+        <div id="configFixedBar" style="position:fixed; bottom:0; left:0; width:100%; background:#fff; border-top:1px solid #ddd; padding:12px; z-index:50;">
+          <button id="btnSaveConfigFile" class="btn" style="width:100%;">保存当前配置到本地</button>
+        </div>
       </section>
     </div>
   </div>
@@ -171,29 +176,26 @@
         configs = {};
         persist('wuliao_configs', configs);
       }
-
       // 当前选中配置，默认空
       let current = load('wuliao_current', null);
-
-      // 尝试从 GitHub 获取网络配置文件
-      fetch('https://raw.githubusercontent.com/hxf6276/wuliao-web/main/configs/default.txt')
+      // 尝试从 GitHub 获取默认配置文件
+      fetch('https://raw.githubusercontent.com/hxf6276/wuliao-net/main/configs/default.txt')
         .then(resp=>{
             if(!resp.ok) throw new Error('GitHub 文件获取失败');
             return resp.text();
         })
         .then(text=>{
-            // 成功获取则保存为“网络配置文件”
-            configs['网络配置文件'] = text;
+            // 保存为“默认配置”
+            configs['默认配置'] = text;
             persist('wuliao_configs', configs);
-            persist('wuliao_current', '网络配置文件');
+            persist('wuliao_current', '默认配置');
             renderMaterials();
             renderConfigEditor();
-
             // 提示加载成功
             const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
             if(configTitleDiv){
                 let notifyInline = document.createElement('span');
-                notifyInline.textContent = ' （已加载网络配置文件）';
+                notifyInline.textContent = ' （已加载云端默认配置）';
                 notifyInline.style.color = '#4CAF50';
                 notifyInline.style.fontSize = '14px';
                 notifyInline.style.fontWeight = 'normal';
@@ -204,8 +206,8 @@
         .catch(err=>{
             console.error('读取 GitHub 默认配置失败', err);
             // 失败则使用本地默认配置，普通配置文件名可以是"default.txt"
-            if(!configs['default.txt']){
-                configs['default.txt'] = "物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
+            if(!configs['默认配置']){
+                configs['默认配置'] = "物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
                 persist('wuliao_configs', configs);
             }
             // 设置当前配置为已有配置或默认
@@ -213,7 +215,6 @@
             renderMaterials();
             renderConfigEditor();
         });
-
       // 确保记录数组存在
       if(!localStorage.getItem('wuliao_records')){
         persist('wuliao_records', []);
@@ -572,15 +573,14 @@
   function renderConfigEditor(){
     const configs = load('wuliao_configs', {});
     configSelect.innerHTML='';
-    // "网络配置文件" 作为第一个选项, 其余用户自建的配置按名称排序
+    // "默认配置" 作为第一个选项, 其余用户自建的配置按名称排序
     const allKeys = Object.keys(configs);
-    const netKey = '网络配置文件';
     let keys = [];
-    if (allKeys.includes(netKey)) {
-      keys.push(netKey);
+    if (allKeys.includes('默认配置')) {
+      keys.push('默认配置');
     }
-    // 过滤掉网络配置文件的其他用户自建配置
-    keys = keys.concat(allKeys.filter(k => k !== netKey));
+    // 过滤掉默认配置的其他用户自建配置
+    keys = keys.concat(allKeys.filter(k => k !== '默认配置'));
     keys.forEach(fn=>{
       const o = document.createElement('option'); o.value=fn; o.textContent=fn; configSelect.appendChild(o);
     });
@@ -613,7 +613,7 @@
 
   // New config
   btnNewConfig.addEventListener('click', ()=>{
-    const name = prompt('新配置文件名（含或不含 .txt）：','newconfig.txt');
+    const name = prompt('新配置文件名（含或不含 .txt）：','新配置.txt');
     if(!name) return;
     let fn = name.trim();
     if(!fn.endsWith('.txt')) fn += '.txt';
@@ -626,6 +626,8 @@
     persist('wuliao_configs', configs);
     persist('wuliao_current', fn);
     renderConfigEditor();
+    configSelect.value = fn;
+    configText.value = '';
     // open editor focus
     configText.focus();
   });
@@ -633,29 +635,8 @@
   // Bind config select change
   configSelect.addEventListener('change', ()=>{
     const selected = configSelect.value;
-    if(selected === '网络配置文件'){
-      // Fetch from GitHub immediately
-      fetch('https://raw.githubusercontent.com/hxf6276/wuliao-net/main/configs/default.txt')
-        .then(resp=>{
-          if(!resp.ok) throw new Error('GitHub 文件获取失败');
-          return resp.text();
-        })
-        .then(text=>{
-          const configs = load('wuliao_configs', {});
-          configs['网络配置文件'] = text;
-          persist('wuliao_configs', configs);
-          persist('wuliao_current', '网络配置文件');
-          configText.value = text;
-          renderMaterials();
-        })
-        .catch(err=>{
-          alert('网络配置文件读取失败: ' + err.message);
-        });
-    } else {
-      // Local config
-      persist('wuliao_current', selected);
-      loadConfigTextToEditor();
-    }
+    persist('wuliao_current', selected);
+    loadConfigTextToEditor();
   });
 
   // Debounced save
@@ -687,6 +668,64 @@
     load: load, persist: persist, addRecord: addRecord, renderMaterials, renderRecords, renderSummary
   };
 })();
-</script>
+
+
+  // 本地文件选择按钮
+  const configFileInput = document.getElementById('configFileInput');
+  const btnChooseFile = document.getElementById('btnChooseFile');
+  btnChooseFile.addEventListener('click', ()=>{
+    configFileInput.value = '';
+    configFileInput.click();
+  });
+
+  configFileInput.addEventListener('change', function(e){
+    const file = this.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      const content = evt.target.result;
+      // 以文件名为key存储
+      let fn = file.name;
+      const configs = load('wuliao_configs', {});
+      configs[fn] = content;
+      persist('wuliao_configs', configs);
+      persist('wuliao_current', fn);
+      renderConfigEditor();
+      configSelect.value = fn;
+      configText.value = content;
+      // 保证刷新后依然是该配置
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+
+  // 保存当前配置到本地文件，触发浏览器保存对话框
+  const btnSaveConfigFile = document.getElementById('btnSaveConfigFile');
+  btnSaveConfigFile.addEventListener('click', ()=>{
+      const configs = load('wuliao_configs', {});
+      const cur = configSelect.value;
+      let content = configs[cur] || '';
+      let fn = cur;
+      if(!fn) fn = '配置.txt';
+      if(!fn.endsWith('.txt')) fn += '.txt';
+      
+      // 创建Blob对象
+      const blob = new Blob([content], {type:'text/plain;charset=utf-8;'});
+      
+      // 使用浏览器提供的下载方式触发保存对话框
+      if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+          // for IE
+          window.navigator.msSaveOrOpenBlob(blob, fn);
+      } else {
+          const a = document.createElement('a');
+          const url = URL.createObjectURL(blob);
+          a.href = url;
+          a.download = fn;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+      }
+  });
+  </script>
 </body>
 </html>
