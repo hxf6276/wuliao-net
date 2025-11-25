@@ -165,27 +165,51 @@
   function persist(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
   function load(key, fallback){ try{ const s=localStorage.getItem(key); return s?JSON.parse(s):fallback; }catch(e){return fallback;} }
   function ensureDefaultConfigs(){
-    let configs = load('wuliao_configs', null);
-    if(!configs){
-      configs = {
-        "default.txt":"物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n"
-      };
-      persist('wuliao_configs', configs);
-      persist('wuliao_current', 'default.txt');
-    } else {
-      if(!Object.keys(configs).length){
-        configs["default.txt"]="物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
+      let configs = load('wuliao_configs', null);
+      if(!configs){
+        configs = {};
         persist('wuliao_configs', configs);
-        persist('wuliao_current', 'default.txt');
       }
-      if(!load('wuliao_current', null)){
-        persist('wuliao_current', Object.keys(configs)[0]);
+
+      const current = load('wuliao_current', null) || 'default.txt';
+      persist('wuliao_current', current);
+
+      // Only fetch from repository if default.txt is not already in localStorage
+      if(!configs['default.txt']){
+        fetch(window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + 'configs/default.txt')
+          .then(resp => resp.text())
+          .then(text => {
+            configs['default.txt'] = text;
+            persist('wuliao_configs', configs);
+            renderMaterials();
+            renderConfigEditor();
+            // Show notification inline after the "配置文件" title in Config Page
+            const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
+            if(configTitleDiv){
+                let notifyInline = document.createElement('span');
+                notifyInline.textContent = ' （默认配置文件加载成功）';
+                notifyInline.style.color = '#4CAF50';
+                notifyInline.style.fontSize = '14px';
+                notifyInline.style.fontWeight = 'normal';
+                configTitleDiv.appendChild(notifyInline);
+                // Remove after 3 seconds
+                setTimeout(()=>{ notifyInline.remove(); }, 3000);
+            }
+          })
+          .catch(err=>{
+            console.error('加载默认配置失败', err);
+            // fallback to inline default if fetch fails
+            configs['default.txt'] = "物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
+            persist('wuliao_configs', configs);
+            renderMaterials();
+            renderConfigEditor();
+          });
       }
-    }
-    // ensure records exists
-    if(!localStorage.getItem('wuliao_records')){
-      persist('wuliao_records', []);
-    }
+
+      // ensure records exists
+      if(!localStorage.getItem('wuliao_records')){
+        persist('wuliao_records', []);
+      }
   }
 
   // UI elements
