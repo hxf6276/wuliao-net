@@ -183,6 +183,18 @@
             persist('wuliao_configs', configs);
             renderMaterials();
             renderConfigEditor();
+            // Show notification inline after the "配置文件" title in Config Page
+            const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
+            if(configTitleDiv){
+                let notifyInline = document.createElement('span');
+                notifyInline.textContent = ' （默认配置文件加载成功）';
+                notifyInline.style.color = '#4CAF50';
+                notifyInline.style.fontSize = '14px';
+                notifyInline.style.fontWeight = 'normal';
+                configTitleDiv.appendChild(notifyInline);
+                // Remove after 3 seconds
+                setTimeout(()=>{ notifyInline.remove(); }, 3000);
+            }
           })
           .catch(err=>{
             console.error('加载默认配置失败', err);
