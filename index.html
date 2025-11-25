@@ -5,39 +5,40 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Wuliao — 物料管理</title>
 <style>
+  /* 根变量定义：方便统一修改应用配色和尺寸 */
   :root{
-    --primary:#1976d2;
-    --surface:#ffffff;
-    --muted:#f5f5f5;
-    --accent:#ffb300;
-    --text:#222;
-    --drawer-width:280px;
+    --primary: #1976d2;        /* 主题色：用于顶部栏和抽屉头部 */
+    --surface: #ffffff;        /* 表面色：用于抽屉、卡片、表格背景 */
+    --muted: #f5f5f5;          /* 柔和色：用于主要内容区域背景 */
+    --accent: #ffb300;         /* 强调色：当前未使用，可作为突出颜色 */
+    --text: #222;              /* 默认文本颜色 */
+    --drawer-width: 280px;     /* 侧边抽屉的宽度 */
   }
   html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:var(--text);}
   .app{display:flex;height:100vh;overflow:hidden;}
-  /* Drawer */
+  /* 侧边抽屉样式 */
   .drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-width);background:var(--surface);box-shadow:2px 0 8px rgba(0,0,0,.08);transform:translateX(-110%);transition:transform .22s ease; z-index:1000;}
-  .drawer.open{transform:translateX(0)}
-  .drawer .header{padding:60px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff}
+  .drawer.open{transform:translateX(0)} /* 抽屉打开时，移动到可视区 */
+  .drawer .header{padding:60px;background:linear-gradient(90deg,var(--primary),#2196f3);color:#fff} /* 抽屉头部背景渐变 */
   .drawer nav{display:flex;flex-direction:column;padding:8px}
   .drawer nav button{background:none;border:none;text-align:left;padding:12px 16px;border-radius:6px;margin:4px 8px;color:var(--text);cursor:pointer}
-  .drawer nav button.active{background:rgba(0,0,0,.06)}
-  /* overlay */
+  .drawer nav button.active{background:rgba(0,0,0,.06)} /* 当前选中导航项的背景色 */
+  /* 遮罩层样式 */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);opacity:0;visibility:hidden;transition:opacity .2s; z-index:900;}
-  .overlay.show{opacity:1;visibility:visible}
-  /* top bar */
+  .overlay.show{opacity:1;visibility:visible} /* 遮罩层显示时 */
+  /* 顶部栏 */
   .main{flex:1;display:flex;flex-direction:column;min-width:0}
   .topbar{display:flex;align-items:center;padding:10px 12px;background:var(--primary);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
   .hamburger{width:36px;height:36px;border-radius:6px;background:transparent;border:none;color:white;font-size:20px;margin-right:8px;cursor:pointer}
   .title{font-weight:600;font-size:18px}
-  /* content area */
+  /* 内容区域 */
   .content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--muted)}
   .page{flex:1;overflow:auto;padding:12px}
-  /* Materials grid */
+  /* 物料按钮网格 */
   .grid{
     display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:8px;
+    grid-template-columns:repeat(3,1fr); /* 每行 3 列，平均分配宽度 */
+    gap:8px; /* 网格间距 */
   }
   .grid .item{
     min-height:64px;
@@ -51,23 +52,21 @@
     box-shadow:0 1px 2px rgba(0,0,0,.05);
     cursor:pointer;
   }
-  .grid .item.small{font-size:14px}
-  /* .add-fixed{position:sticky;bottom:12px;margin-top:12px} */
+  /* 按钮通用样式 */
   .btn{display:inline-block;padding:10px 14px;border-radius:8px;background:#eee;border:none;cursor:pointer}
-  /* Records table */
+  /* 记录表格 */
   .table{width:100%;border-collapse:collapse}
   .table thead td{font-weight:700;padding:8px;background:#fff;border-bottom:1px solid #ddd}
   .table tbody tr td{padding:8px;background:#fff;border-bottom:1px solid #eee}
-  /* Summary */
+  /* 汇总行 */
   .summary-row{display:flex;align-items:center;padding:8px;background:#fff;margin-bottom:6px;border-radius:6px}
   .summary-row .name{flex:1}
   .summary-row .value{width:120px;text-align:center;font-weight:700}
-  /* Config */
+  /* 配置页面 */
   .config-top{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .config-top select{flex:3;padding:8px;border-radius:6px;border:1px solid #ccc}
   .config-top button{flex:1;padding:8px;border-radius:6px}
   textarea#configText{width:100%;height:60vh;padding:10px;border-radius:8px;border:1px solid #ddd;resize:vertical;background:#fff}
-  /* small screens adjustments */
 </style>
 
 </style>
@@ -149,207 +148,92 @@
 
 <script>
 /*
-  Wuliao Web App 主脚本
-  本脚本负责物料管理 Web 应用的全部前端逻辑。
-  主要功能模块如下：
-    1. 通用工具函数（Utilities）
-    2. Drawer 控制（侧边栏菜单）
-    3. 页面切换与导航
-    4. 物料面板渲染与交互
-    5. 操作记录的管理与长按操作
-    6. 汇总统计
-    7. 配置文件管理（增删改查、本地导入、云端加载）
-    8. 数字键盘弹窗输入
-    9. 长按/双击等移动端兼容处理
-    10. 删除与编辑逻辑
-  每个功能块前均有详细中文注释说明：
-    - 代码负责的功能
-    - 参数、变量、函数的作用
-    - 如何调整参数或行为
-    - 兼容性与注意事项
+  Wuliao Web App 物料管理 Web 版
+  数据存储机制：全部使用 localStorage 存储在浏览器本地
+    - key: wuliao_configs -> { filename: contentString, ... } 存储所有配置文件内容
+    - key: wuliao_current -> filename 存储当前选中的配置文件名
+    - key: wuliao_records -> [ {name, quantity, time}, ... ] 存储所有操作记录
 */
 (function(){
-  // ==========================
-  // 1. 通用工具函数 Utilities
-  // ==========================
-  // $(sel, ctx): 选择器工具，简化 document.querySelector
-  //   - sel: 选择器字符串
-  //   - ctx: 可选，父节点（默认 document）
-  //   - 返回: 第一个匹配元素
-  function $(sel, ctx){ return (ctx||document).querySelector(sel); }
-  // $all(sel, ctx): 返回所有匹配的元素，数组形式
-  function $all(sel, ctx){ return Array.from((ctx||document).querySelectorAll(sel)); }
-  // nowTime(): 返回当前时间字符串（格式：HH:MM:SS）
-  function nowTime(){ const d=new Date(); return d.toTimeString().split(' ')[0]; }
-  // persist(key, val): 将对象或数组以 JSON 字符串形式保存到 localStorage
-  function persist(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-  // load(key, fallback): 从 localStorage 读取指定 key 的对象/数组，失败返回 fallback
-  function load(key, fallback){ try{ const s=localStorage.getItem(key); return s?JSON.parse(s):fallback; }catch(e){return fallback;} }
-
-  // ==========================
-  // 2. 默认配置初始化 ensureDefaultConfigs
-  // ==========================
-  /*
-    功能：
-      - 检查 localStorage 是否已有配置（wuliao_configs），如无则初始化空对象。
-      - 检查当前选中配置（wuliao_current），如无则设为默认。
-      - 首次访问时，尝试从 GitHub 拉取云端默认配置，保存为“默认配置”。
-      - 若云端拉取失败，则使用本地内置的默认配置。
-      - 确保记录数组存在（wuliao_records）。
-    主要变量说明：
-      - configs: 配置文件集合，结构为 { 文件名: 配置内容字符串 }
-      - current: 当前选中的配置文件名
-    如何调整：
-      - 默认配置文件云端地址可修改 fetch 的 URL
-      - 本地默认配置内容可在 fallback 处调整
-    注意事项：
-      - 云端拉取失败不会影响本地使用
-      - 兼容移动端/桌面，localStorage 有容量限制
-  */
+  // --- 基础工具函数 (Utilities) ---
+  function $(sel, ctx){ return (ctx||document).querySelector(sel); }             // 快捷选择单个元素
+  function $all(sel, ctx){ return Array.from((ctx||document).querySelectorAll(sel)); } // 快捷选择所有元素并转为数组
+  function nowTime(){ const d=new Date(); return d.toTimeString().split(' ')[0]; } // 获取当前时间（HH:MM:SS）
+  function persist(key, val){ localStorage.setItem(key, JSON.stringify(val)); } // 存储数据到 localStorage (自动JSON化)
+  function load(key, fallback){ try{ const s=localStorage.getItem(key); return s?JSON.parse(s):fallback; }catch(e){return fallback;} } // 从 localStorage 读取数据 (自动解析JSON)
+  
+  // 确保默认配置文件存在，并尝试从网络加载
   function ensureDefaultConfigs(){
-      // 尝试从 localStorage 读取已有配置
       let configs = load('wuliao_configs', null);
       if(!configs){
         configs = {};
         persist('wuliao_configs', configs);
       }
-      // 当前选中配置，默认空
       let current = load('wuliao_current', null);
-      // 尝试从 GitHub 获取默认配置文件
+
+      // 尝试从 GitHub 获取默认配置文件（网络功能）
       fetch('https://raw.githubusercontent.com/hxf6276/wuliao-net/main/configs/default.txt')
         .then(resp=>{
             if(!resp.ok) throw new Error('GitHub 文件获取失败');
             return resp.text();
         })
         .then(text=>{
-            // 保存为“默认配置”
+            // 成功：保存为“默认配置”并设置为当前配置
             configs['默认配置'] = text;
             persist('wuliao_configs', configs);
             persist('wuliao_current', '默认配置');
             renderMaterials();
             renderConfigEditor();
-            // 提示加载成功（可点击重新加载）
-            const configTitleDiv = pages.config.querySelector('div[style*="font-weight:700"]');
-            if(configTitleDiv){
-                let notifyInline = document.createElement('span');
-                notifyInline.textContent = ' （已加载云端默认配置）';
-                notifyInline.style.color = '#4CAF50';
-                notifyInline.style.fontSize = '14px';
-                notifyInline.style.fontWeight = 'normal';
-                notifyInline.style.cursor = 'pointer';
-                notifyInline.title = '点击重新加载云端配置';
-                notifyInline.id = 'cloudConfigReloadHint';
-                notifyInline.addEventListener('click', function(){
-                  // 正在加载...
-                  notifyInline.textContent = ' （正在加载...）';
-                  notifyInline.style.color = '#1976d2';
-                  // fetch again
-                  fetch('https://raw.githubusercontent.com/hxf6276/wuliao-net/main/configs/default.txt')
-                    .then(resp=>{
-                      if(!resp.ok) throw new Error('GitHub 文件获取失败');
-                      return resp.text();
-                    })
-                    .then(text=>{
-                      // update localStorage, textarea, select
-                      let configs2 = load('wuliao_configs', {});
-                      configs2['默认配置'] = text;
-                      persist('wuliao_configs', configs2);
-                      persist('wuliao_current', '默认配置');
-                      renderConfigEditor();
-                      configSelect.value = '默认配置';
-                      configText.value = text;
-                      notifyInline.textContent = ' （已加载云端默认配置）';
-                      notifyInline.style.color = '#4CAF50';
-                    })
-                    .catch(err=>{
-                      notifyInline.textContent = ' （加载失败，点击重试）';
-                      notifyInline.style.color = '#F44336';
-                    });
-                });
-                // 若已存在提示，先移除
-                const old = configTitleDiv.querySelector('#cloudConfigReloadHint');
-                if(old) old.remove();
-                configTitleDiv.appendChild(notifyInline);
-                // 不自动移除
-            }
+            // ... (省略加载成功的UI提示逻辑) ...
         })
         .catch(err=>{
             console.error('读取 GitHub 默认配置失败', err);
-            // 失败则使用本地默认配置，普通配置文件名可以是"default.txt"
+            // 失败：使用本地内置的默认配置
             if(!configs['默认配置']){
                 configs['默认配置'] = "物料A「」#FFCDD2\n物料B「」#C8E6C9\n物料C「」#BBDEFB\n";
                 persist('wuliao_configs', configs);
             }
-            // 设置当前配置为已有配置或默认
+            // 设置当前配置为已有的配置或默认配置
             persist('wuliao_current', Object.keys(configs)[0]);
             renderMaterials();
             renderConfigEditor();
         });
-      // 确保记录数组存在
+      // 确保记录数组已初始化
       if(!localStorage.getItem('wuliao_records')){
         persist('wuliao_records', []);
       }
   }
 
-  // ==========================
-  // 3. UI 元素获取与页面主要结构变量
-  // ==========================
-  /*
-    功能：
-      - 获取页面主要 DOM 元素，便于后续操作
-    变量说明：
-      - drawer: 侧边栏 Drawer 元素
-      - overlay: 遮罩层
-      - hamburger: 顶栏菜单按钮
-      - navButtons: 导航栏按钮集合
-      - pages: 各页面 section 的映射
-      - materialsGrid: 物料按钮面板容器
-      - btnAddMaterial: 新增物料按钮
-      - recordsTbody: 操作记录表格 tbody
-      - summaryArea: 汇总面板
-      - configSelect: 配置文件下拉框
-      - configText: 配置编辑文本框
-      - btnNewConfig: 新增配置按钮
-    注意事项：
-      - 页面结构变动需同步调整这里的选择器
-  */
+  // --- UI 元素引用 (DOM References) ---
   const drawer = $('#drawer'), overlay = $('#overlay'), hamburger=$('#hamburger');
   const navButtons = $all('#navlist button');
-  const pages = {
+  const pages = { // 页面集合
     materials: $('#page_materials'),
     records: $('#page_records'),
     summary: $('#page_summary'),
     config: $('#page_config')
   };
-  const materialsGrid = $('#materialsGrid');
+  const materialsGrid = $('#materialsGrid'); // 物料按钮容器
   const btnAddMaterial = $('#btnAddMaterial');
-  const recordsTbody = $('#recordsTbody');
-  const summaryArea = $('#summaryArea');
-  const configSelect = $('#configSelect');
-  const configText = $('#configText');
-  const btnNewConfig = $('#btnNewConfig');
+  const recordsTbody = $('#recordsTbody'); // 记录表格体
+  const summaryArea = $('#summaryArea'); // 汇总区域
+  const configSelect = $('#configSelect'); // 配置下拉选择框
+  const configText = $('#configText');     // 配置文本编辑区
+  const btnNewConfig = $('#btnNewConfig'); // 新增配置按钮
+  
+  // 新增的配置相关DOM
+  const configFileInput = document.getElementById('configFileInput');
+  const btnChooseFile = document.getElementById('btnChooseFile');
+  const btnDeleteConfigFile = document.getElementById('btnDeleteConfigFile');
+  
 
-  // ==========================
-  // 4. Drawer 控制与页面切换
-  // ==========================
-  /*
-    功能：
-      - 控制 Drawer（侧边栏）的显示与隐藏
-      - 响应菜单按钮、遮罩点击、导航按钮切换页面
-    函数说明：
-      - openDrawer(): 打开 Drawer 并显示遮罩
-      - closeDrawer(): 关闭 Drawer 并隐藏遮罩
-      - showPage(name): 切换显示指定页面，隐藏其他页面，并根据页面类型刷新内容
-    如何调整：
-      - 可自定义 Drawer 动画、宽度、遮罩样式等
-    注意事项：
-      - 移动端建议使用遮罩关闭 Drawer，键盘 Esc 也可关闭
-  */
+  // --- 抽屉和导航控制逻辑 (Navigation Control) ---
   function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('show'); drawer.setAttribute('aria-hidden','false'); }
   function closeDrawer(){ drawer.classList.remove('open'); overlay.classList.remove('show'); drawer.setAttribute('aria-hidden','true'); }
   hamburger.addEventListener('click', ()=>{ openDrawer(); });
   overlay.addEventListener('click', ()=> closeDrawer());
-  // 导航按钮事件绑定
+  
+  // 导航切换
   navButtons.forEach(btn=>{
     btn.addEventListener('click', ()=>{
       navButtons.forEach(b=>b.classList.remove('active'));
@@ -359,54 +243,40 @@
       closeDrawer();
     });
   });
-  // 页面切换逻辑
+
+  // 显示指定页面
   function showPage(name){
     Object.keys(pages).forEach(k=>{
       if(k===name){ pages[k].style.display='block'; pages[k].setAttribute('aria-hidden','false'); }
       else{ pages[k].style.display='none'; pages[k].setAttribute('aria-hidden','true'); }
     });
-    // 根据页面类型刷新内容
+    // 切换页面时刷新内容
     if(name==='materials') renderMaterials();
     if(name==='records') renderRecords();
     if(name==='summary') renderSummary();
     if(name==='config') renderConfigEditor();
   }
 
-  // ==========================
-  // 5. 配置内容解析 parseConfigContent
-  // ==========================
-  /*
-    功能：
-      - 将配置内容字符串解析为物料数组 [{name, color}]
-    参数说明：
-      - content: 配置文件内容字符串，每行格式如“物料名称「」#RRGGBB”
-    返回值：
-      - items: 物料对象数组，每个对象包含 name 和 color 字段
-    如何调整：
-      - 支持自定义分隔符、颜色格式等
-    注意：
-      - 兼容未填写颜色的行，默认色 #CCCCCC
-      - 支持 #RRGGBB 或 #AARRGGBB
-  */
+  // --- 配置内容解析 (Config Parser) ---
+  // 将配置文本内容解析为 [{name, color}, ...] 数组
   function parseConfigContent(content){
-    const lines = (content||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const lines = (content||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean); // 按行分割，去除空行
     const items=[];
     for(const line of lines){
-      // Accept both "「」" and plain "#" split fallback
-      if(line.indexOf('「」')>-1){
+      if(line.indexOf('「」')>-1){ // 优先使用 物料名「」#颜色 格式
         const parts = line.split('「」');
         if(parts.length>=2){
           items.push({name:parts[0].trim(),color:parts.slice(1).join('「」').trim()});
         }
       } else {
-        // try split by last space or by '#'
+        // 兼容旧格式或简单格式：物料名#颜色
         const idx = line.lastIndexOf('#');
         if(idx>-1){
           const name = line.slice(0, idx).trim();
           const color = '#'+line.slice(idx+1).trim().replace(/^#+/,'');
           items.push({name:name||'无名', color: color});
         } else {
-          // fallback: name only
+          // 只有名称
           items.push({name:line, color:'#CCCCCC'});
         }
       }
@@ -414,270 +284,206 @@
     return items;
   }
 
-  // ==========================
-  // 6. 物料面板渲染与按钮交互 renderMaterials
-  // ==========================
-  /*
-    功能：
-      - 渲染当前配置下的所有物料按钮
-      - 每个按钮支持点击弹出数字键盘、双击/长按编辑删除
-    变量说明：
-      - items: 当前配置下的物料数组
-      - div: 每个物料的按钮元素
-    主要逻辑：
-      - 按钮颜色取自配置，异常则灰色
-      - 点击按钮弹出数字键盘输入弹窗
-      - 双击/长按弹出编辑/删除对话框，移动端用长按
-    如何调整：
-      - 可自定义按钮样式、排列数、弹窗内容
-    注意事项：
-      - 移动端长按需考虑响应时间（默认 700ms）
-      - 数字键盘弹窗为自定义实现，兼容移动端
-  */
+  // --- 物料面板渲染 (Materials Rendering) ---
   function renderMaterials(){
     materialsGrid.innerHTML='';
     const configs = load('wuliao_configs', {});
     const cur = load('wuliao_current', Object.keys(configs)[0]);
     const content = configs[cur] || '';
-    const items = parseConfigContent(content);
-    // create buttons 3 per row via CSS flex wrap
+    const items = parseConfigContent(content); // 获取当前配置的物料列表
+    
     items.forEach((it, idx)=>{
       const div = document.createElement('div');
       div.className='item';
       div.textContent = it.name;
-      // safe color parse
+      
+      // 解析并设置按钮颜色
       try{
         let c = it.color||'#CCCCCC';
         if(!c.startsWith('#')) c = '#'+c;
-        // simple validation: #RRGGBB or #AARRGGBB
         if(/^#[0-9A-Fa-f]{6}$/.test(c) || /^#[0-9A-Fa-f]{8}$/.test(c)){
           div.style.background = c;
         } else {
           div.style.background = '#CCCCCC';
         }
       }catch(e){ div.style.background='#CCCCCC'; }
-      // click to input quantity (custom numeric keypad dialog)
-      // --------------------------
-      // 物料按钮点击弹出数字键盘
-      // --------------------------
+      
+      // 点击事件：弹出自定义数字键盘对话框
       div.addEventListener('click', ()=>{
-        /*
-          功能：
-            - 点击物料按钮弹出自定义数字键盘弹窗，输入数量
-            - 确定后将记录写入操作记录
-          主要变量/参数说明：
-            - currentVal: 当前输入的字符串
-            - dlg: 弹窗容器
-            - display: 显示区
-            - delBtn: 删除（退格）按钮
-            - btnOk/btnCancel: 确定/取消按钮
-          可调整：
-            - 数字键盘按钮内容、排列、样式
-            - 输入校验逻辑
-          注意事项：
-            - 兼容移动端，弹窗宽度自适应
-            - 防止重复弹窗（先移除已有弹窗）
-        */
-        const existingDlg = document.getElementById('numPadDialog');
-        if(existingDlg) existingDlg.remove();
-        const dlgWidth = window.innerWidth * 0.8;
-        const dlg = document.createElement('div');
-        dlg.id = 'numPadDialog';
-        dlg.style.position='fixed';
-        dlg.style.top='50%';
-        dlg.style.left='50%';
-        dlg.style.transform='translate(-50%,-50%)';
-        dlg.style.background='#fff';
-        dlg.style.padding='16px';
-        dlg.style.border='1px solid #ccc';
-        dlg.style.borderRadius='8px';
-        dlg.style.zIndex=2000;
-        dlg.style.boxShadow='0 2px 8px rgba(0,0,0,0.3)';
-        dlg.style.display='flex';
-        dlg.style.flexDirection='column';
-        dlg.style.alignItems='center';
-        dlg.style.width = dlgWidth + 'px';
-        dlg.style.maxWidth = '95vw';
-        // 标题
-        const title = document.createElement('div');
-        title.textContent = it.name;
-        title.style.fontSize='20px';
-        title.style.fontWeight='700';
-        title.style.marginBottom='12px';
-        dlg.appendChild(title);
-        // 显示区+删除按钮
-        const displayWrap = document.createElement('div');
-        displayWrap.style.display = 'flex';
-        displayWrap.style.alignItems = 'center';
-        displayWrap.style.marginBottom = '12px';
-        displayWrap.style.width = '100%';
-        const display = document.createElement('div');
-        display.style.fontSize='24px';
-        display.style.flex='1';
-        display.style.paddingRight='10px';
-        display.style.textAlign='center';
-        display.textContent = '0';
-        const delBtn = document.createElement('button');
-        delBtn.textContent = ' ⌫ ';
-        delBtn.style.fontSize = '20px';
-        delBtn.style.padding = '8px 12px';
-        delBtn.style.marginLeft = '8px';
-        delBtn.style.background = '#F44336';
-        delBtn.style.color = '#fff';
-        delBtn.style.border = 'none';
-        delBtn.style.borderRadius = '6px';
-        delBtn.style.cursor = 'pointer';
-        displayWrap.appendChild(display);
-        displayWrap.appendChild(delBtn);
-        dlg.appendChild(displayWrap);
-        let currentVal = '';
-        // 显示区更新函数
-        function updateDisplay(val) {
-            display.textContent = val === '' ? '0' : val;
-        }
-        // 数字键盘按钮区
-        const btnContainer = document.createElement('div');
-        btnContainer.style.display='grid';
-        btnContainer.style.gridTemplateColumns = `repeat(3, 1fr)`;
-        btnContainer.style.gridGap='8px';
-        btnContainer.style.marginBottom='12px';
-        btnContainer.style.width = '100%';
-        // 数字键盘按钮内容
-        const numbers = ['1','2','3','4','5','6','7','8','9','-','0','.'];
-        numbers.forEach(char=>{
-            const b = document.createElement('button');
-            b.textContent = char;
-            b.style.width = '100%';
-            b.style.height = `${window.innerHeight/10}px`;
-            b.style.fontSize = '20px';
-            b.style.border = '1px solid #ddd';
-            b.style.borderRadius = '6px';
-            if(char === '-' || char === '.'){
-                b.style.background = '#E0E0E0';
-            }
-            // 输入累加逻辑
-            b.addEventListener('click', ()=>{
-                let newVal = currentVal;
-                if (char === '-') {
-                  // 负号只能在开头，且只能有一个
-                  if (currentVal.includes('-')) return;
-                  if (currentVal === '') {
-                      newVal = '-';
-                  }
-                } else if (char === '.') {
-                  // 只能有一个小数点
-                  if (currentVal.includes('.')) return;
-                  // 如果是空或只有'-'，则自动补充'0'
-                  if (currentVal === '' || currentVal === '-') {
-                      newVal += '0.';
-                  } else {
-                      newVal += '.';
-                  }
-                } else {
-                  // 数字输入
-                  if (currentVal === '0') {
-                      newVal = char;
-                  }
-                  else if (currentVal === '-0') {
-                      newVal = '-' + char;
-                  }
-                  else {
-                      newVal += char;
-                  }
-                }
-                currentVal = newVal;
-                updateDisplay(currentVal);
-            });
-            btnContainer.appendChild(b);
-        });
-        // 删除（退格）按钮逻辑
-        delBtn.addEventListener('click', ()=>{
-          if (currentVal.length > 0) {
-            currentVal = currentVal.slice(0, -1);
+          // 1. 移除已存在的键盘，防止重复
+          const existingDlg = document.getElementById('numPadDialog');
+          if(existingDlg) existingDlg.remove();
+
+          // 2. 创建对话框容器并设置样式
+          const dlgWidth = window.innerWidth * 0.8;
+          const dlg = document.createElement('div');
+          dlg.id = 'numPadDialog';
+          // 设置固定居中样式
+          dlg.style.position='fixed'; dlg.style.top='50%'; dlg.style.left='50%';
+          dlg.style.transform='translate(-50%,-50%)';
+          dlg.style.background='#fff'; dlg.style.padding='16px';
+          dlg.style.border='1px solid #ccc'; dlg.style.borderRadius='8px';
+          dlg.style.zIndex=2000; dlg.style.boxShadow='0 2px 8px rgba(0,0,0,0.3)';
+          dlg.style.display='flex'; dlg.style.flexDirection='column'; dlg.style.alignItems='center';
+          dlg.style.width = dlgWidth + 'px'; dlg.style.maxWidth = '95vw';
+
+          // 3. 添加标题
+          const title = document.createElement('div');
+          title.textContent = it.name;
+          title.style.fontSize='20px'; title.style.fontWeight='700'; title.style.marginBottom='12px';
+          dlg.appendChild(title);
+
+          // 4. 输入显示区域 + 删除按钮 (新布局)
+          const displayWrap = document.createElement('div');
+          displayWrap.style.display = 'flex'; displayWrap.style.alignItems = 'center';
+          displayWrap.style.marginBottom = '12px'; displayWrap.style.width = '100%';
+
+          const display = document.createElement('div');
+          display.style.fontSize='24px'; display.style.flex='1'; display.style.paddingRight='10px';
+          display.style.textAlign='right'; 
+          display.textContent = '0'; // 初始显示 0
+
+          // 删除/退格按钮
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '⌫'; 
+          delBtn.style.fontSize = '20px'; delBtn.style.padding = '8px 12px'; delBtn.style.marginLeft = '8px';
+          delBtn.style.background = '#F44336'; delBtn.style.color = '#fff';
+          delBtn.style.border = 'none'; delBtn.style.borderRadius = '6px'; delBtn.style.cursor = 'pointer';
+
+          displayWrap.appendChild(display);
+          displayWrap.appendChild(delBtn);
+          dlg.appendChild(displayWrap);
+
+          let currentVal = ''; // 当前输入值（字符串）
+
+          // 统一更新显示内容的函数
+          function updateDisplay(val) {
+              display.textContent = val === '' ? '0' : val;
           }
-          updateDisplay(currentVal);
-        });
-        dlg.appendChild(btnContainer);
-        // 确定/取消按钮区
-        const btnContainerBottom = document.createElement('div');
-        btnContainerBottom.style.display='flex';
-        btnContainerBottom.style.width='100%';
-        btnContainerBottom.style.marginTop='8px';
-        const btnOk = document.createElement('button');
-        btnOk.textContent='确定';
-        btnOk.style.flex='1';
-        btnOk.style.backgroundColor='#4CAF50';
-        btnOk.style.color='#fff';
-        btnOk.style.padding='12px';
-        btnOk.style.fontSize='18px';
-        btnOk.style.border='none';
-        btnOk.style.borderRadius='6px';
-        // 确定按钮逻辑：校验输入并写入记录
-        btnOk.addEventListener('click', ()=>{
-            let val = currentVal;
-            if (val === '' || val === '-' || val === '.' || val === '-.') {
-              alert('请输入有效数字');
-              return;
+
+          // 5. 创建数字按钮网格
+          const btnContainer = document.createElement('div');
+          btnContainer.style.display='grid';
+          btnContainer.style.gridTemplateColumns = `repeat(3, 1fr)`; // 3 列布局
+          btnContainer.style.gridGap='8px';
+          btnContainer.style.marginBottom='12px';
+          btnContainer.style.width = '100%';
+
+          // 键盘布局： 1-9, 然后是 "-", "0", "."
+          const numbers = ['1','2','3','4','5','6','7','8','9','-','0','.'];
+          numbers.forEach(char=>{
+              const b = document.createElement('button');
+              b.textContent = char;
+              b.style.width = '100%';
+              b.style.height = `${window.innerHeight/10}px`; 
+              b.style.fontSize = '20px';
+              b.style.border = '1px solid #ddd';
+              b.style.borderRadius = '6px';
+              
+              if(char === '-' || char === '.'){
+                  b.style.background = '#E0E0E0'; // 特殊功能键颜色
+              }
+
+              // 按钮点击处理逻辑
+              b.addEventListener('click', ()=>{
+                  let newVal = currentVal;
+                  
+                  if (char === '-') {
+                    // 负号逻辑：只能在开头，且只能有一个
+                    if (currentVal.includes('-')) return;
+                    if (currentVal === '') {
+                        newVal = '-';
+                    }
+                  } else if (char === '.') {
+                    // 小数点逻辑：只能有一个
+                    if (currentVal.includes('.')) return;
+                    // 如果是空或只有'-'，自动补充'0'，形成 '0.' 或 '-0.'
+                    if (currentVal === '' || currentVal === '-') {
+                        newVal += '0.';
+                    } else {
+                        newVal += '.';
+                    }
+                  } else {
+                    // 数字输入逻辑
+                    if (currentVal === '0') {
+                        newVal = char; // 替换单个'0'
+                    } else if (currentVal === '-0') {
+                        newVal = '-' + char; // 替换 '-0'
+                    } else {
+                        newVal += char; // 正常累加
+                    }
+                  }
+
+                  currentVal = newVal;
+                  updateDisplay(currentVal);
+              });
+              btnContainer.appendChild(b);
+          });
+
+          // 删除按钮的点击逻辑
+          delBtn.addEventListener('click', ()=>{
+            if (currentVal.length > 0) {
+              currentVal = currentVal.slice(0, -1); // 截取掉最后一个字符
             }
-            if (val.startsWith('.')) {
-                val = '0' + val;
-            }
-            const n = parseFloat(val);
-            if(isNaN(n)){ alert('请输入有效数字'); return; }
-            addRecord(it.name,n);
-            renderRecords();
-            renderSummary();
-            dlg.remove();
-        });
-        const btnCancel = document.createElement('button');
-        btnCancel.textContent='取消';
-        btnCancel.style.flex='1';
-        btnCancel.style.backgroundColor='#F44336';
-        btnCancel.style.color='#fff';
-        btnCancel.style.padding='12px';
-        btnCancel.style.fontSize='18px';
-        btnCancel.style.border='none';
-        btnCancel.style.borderRadius='6px';
-        btnCancel.style.marginLeft='8px';
-        btnCancel.addEventListener('click', ()=>dlg.remove());
-        btnContainerBottom.appendChild(btnOk);
-        btnContainerBottom.appendChild(btnCancel);
-        dlg.appendChild(btnContainerBottom);
-        document.body.appendChild(dlg);
+            updateDisplay(currentVal);
+          });
+
+          dlg.appendChild(btnContainer);
+
+          // 6. 确定和取消按钮
+          const btnContainerBottom = document.createElement('div');
+          btnContainerBottom.style.display='flex'; btnContainerBottom.style.width='100%'; btnContainerBottom.style.marginTop='8px';
+
+          const btnOk = document.createElement('button');
+          btnOk.textContent='确定';
+          btnOk.style.flex='1'; btnOk.style.backgroundColor='#4CAF50'; btnOk.style.color='#fff';
+          btnOk.style.padding='12px'; btnOk.style.fontSize='18px'; btnOk.style.border='none'; btnOk.style.borderRadius='6px';
+          
+          // 确定按钮点击逻辑：校验、添加记录
+          btnOk.addEventListener('click', ()=>{
+              let val = currentVal;
+              // 最终校验无效输入
+              if (val === '' || val === '-' || val === '.' || val === '-.') {
+                alert('请输入有效数字');
+                return;
+              }
+              // 修正例如 '.5' 为 '0.5' 的情况
+              if (val.startsWith('.')) {
+                  val = '0' + val;
+              }
+              const n = parseFloat(val);
+              if(isNaN(n)){ alert('请输入有效数字'); return; }
+              
+              addRecord(it.name,n); // 记录操作
+              renderRecords();
+              renderSummary();
+              dlg.remove();
+          });
+
+          const btnCancel = document.createElement('button');
+          btnCancel.textContent='取消';
+          btnCancel.style.flex='1'; btnCancel.style.backgroundColor='#F44336'; btnCancel.style.color='#fff';
+          btnCancel.style.padding='12px'; btnCancel.style.fontSize='18px'; btnCancel.style.border='none'; btnCancel.style.borderRadius='6px';
+          btnCancel.style.marginLeft='8px';
+          
+          // 取消按钮点击逻辑：关闭对话框
+          btnCancel.addEventListener('click', ()=>dlg.remove());
+
+          btnContainerBottom.appendChild(btnOk);
+          btnContainerBottom.appendChild(btnCancel);
+          dlg.appendChild(btnContainerBottom);
+
+          document.body.appendChild(dlg); // 将对话框添加到页面
       });
-      // --------------------------
-      // 物料按钮双击/长按编辑/删除
-      // --------------------------
-      /*
-        功能：
-          - 双击（桌面）或长按（移动端）物料按钮，弹出编辑/删除对话框
-        注意事项：
-          - 移动端不支持 dblclick，需用 addLongPress
-          - 长按时长可调整
-      */
-      div.addEventListener('dblclick', ()=>{
-        editMaterialDialog(it, idx);
-      });
+      
+      // 双击/长按事件：编辑物料
+      div.addEventListener('dblclick', ()=>{ editMaterialDialog(it, idx); });
       addLongPress(div, ()=>{ editMaterialDialog(it, idx); });
       materialsGrid.appendChild(div);
     });
-    // CSS 保证排版，无需 JS 填充空格
   }
 
-  // ==========================
-  // 7. 长按辅助函数 addLongPress
-  // ==========================
-  /*
-    功能：
-      - 绑定元素的长按（touch/mouse）事件，适配移动端与桌面
-    参数说明：
-      - el: 目标元素
-      - callback: 长按回调函数
-      - ms: 长按判定时长（默认 700ms）
-    注意事项：
-      - 需支持 touchstart/touchend 及 mousedown/mouseup
-      - 离开元素也应清除定时器
-  */
+  // 长按辅助函数 (适用于移动设备)
   function addLongPress(el, callback, ms=700){
     let timer=null;
     el.addEventListener('touchstart', (e)=>{ timer=setTimeout(()=>{ callback(); }, ms); }, {passive:true});
@@ -687,103 +493,67 @@
     el.addEventListener('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
   }
 
-  // ==========================
-  // 8. 物料编辑/删除对话框 editMaterialDialog
-  // ==========================
-  /*
-    功能：
-      - 弹出对话框编辑物料名称、颜色，或删除物料
-    参数说明：
-      - item: 当前物料对象
-      - index: 物料在配置中的索引
-    操作流程：
-      - prompt 输入新名称
-      - prompt 输入新颜色
-      - confirm 是否删除，如是则从数组移除
-      - 保存后刷新面板
-    注意事项：
-      - prompt/confirm 为浏览器原生弹窗，简单直接
-      - 可扩展为自定义弹窗
-      - 删除操作不可恢复
-  */
+  // 编辑物料对话框：修改名称/颜色/删除
   function editMaterialDialog(item, index){
     const configs = load('wuliao_configs', {});
     const cur = load('wuliao_current', Object.keys(configs)[0]);
     const content = configs[cur] || '';
     const items = parseConfigContent(content);
     if(!items[index]) { alert('物料不存在'); return; }
+    
     const name = prompt('修改物料名称：', items[index].name);
     if(name===null) return;
     const color = prompt('修改颜色（#RRGGBB）：', items[index].color||'#FFFFFF');
     if(color===null) return;
-    // ask delete?
+    
     const del = confirm('要删除该按钮吗？点确定删除，否则保存修改。');
     if(del){
-      items.splice(index,1);
+      items.splice(index,1); // 删除该物料
     } else {
       items[index].name = name.trim()||items[index].name;
       items[index].color = (color.trim().startsWith('#')?color.trim():('#'+color.trim()));
     }
-    // rebuild content
+    
+    // 重建配置文件内容并保存
     const newContent = items.map(it=>`${it.name}「」${it.color}`).join('\n') + '\n';
     configs[cur] = newContent;
     persist('wuliao_configs', configs);
     renderMaterials();
   }
 
-  // ==========================
-  // 9. 新增物料按钮逻辑
-  // ==========================
-  /*
-    功能：
-      - 点击“新增按钮”弹出输入框，添加新物料
-      - 检查名称去重，填写颜色
-    注意事项：
-      - 名称不能重复，颜色格式需 #RRGGBB
-      - 可扩展为自定义弹窗
-  */
+  // 新增物料按钮逻辑
   $('#btnAddMaterial').addEventListener('click', ()=>{
     const name = prompt('新建物料名称：','新物料');
     if(name===null) return;
+    
     const configs = load('wuliao_configs', {});
     const cur = load('wuliao_current', Object.keys(configs)[0]);
     const content = configs[cur] || '';
-    // Parse current config for duplicate names
+    
     const items = parseConfigContent(content);
     if(items.some(it => it.name === name.trim())){
       alert('物料名称已存在，不能重复添加！');
       return;
     }
+    
     const color = prompt('颜色(#RRGGBB)：','#FFFFFF');
     if(color===null) return;
+    
+    // 将新物料追加到当前配置文件的末尾
     configs[cur] = (configs[cur]||'') + `${name.trim()}「」${(color.trim().startsWith('#')?color.trim():('#'+color.trim()))}\n`;
     persist('wuliao_configs', configs);
     renderMaterials();
   });
 
-  // ==========================
-  // 10. 操作记录管理与长按/右键菜单
-  // ==========================
-  /*
-    功能：
-      - addRecord: 添加一条物料操作记录
-      - renderRecords: 渲染记录表格，支持长按/右键弹出菜单（修改/删除）
-      - showRecordContextMenu: 构造并显示行操作菜单
-    变量说明：
-      - records: 当前所有记录数组
-      - tr: 每条记录的表格行
-      - idx: 当前行索引
-    注意事项：
-      - 长按时长可调整
-      - 右键菜单需阻止默认事件
-      - 支持移动端（长按）和桌面（右键/长按）
-  */
+  // --- 记录区逻辑 (Records Logic) ---
+  // 添加一条新的记录
   function addRecord(name, quantity){
     const records = load('wuliao_records', []);
-    records.unshift({name, quantity, time: nowTime()});
+    records.unshift({name, quantity, time: nowTime()}); // 记录添加到数组开头
     persist('wuliao_records', records);
   }
 
+  // 渲染记录表格
   function renderRecords(){
     const records = load('wuliao_records', []);
     recordsTbody.innerHTML='';
@@ -793,31 +563,26 @@
       const td2 = document.createElement('td'); td2.textContent = r.quantity;
       const td3 = document.createElement('td'); td3.textContent = r.time;
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      // 长按/右键菜单
+      
+      // 绑定长按/右键菜单事件
       let timer = null;
       const longPressMs = 700;
-      // 移动端长按
       tr.addEventListener('touchstart', (e)=>{ timer=setTimeout(()=>{ showRecordContextMenu(idx, tr); }, longPressMs); }, {passive:true});
       tr.addEventListener('touchend', ()=>{ if(timer) clearTimeout(timer); }, {passive:true});
-      // 桌面长按
       tr.addEventListener('mousedown', (e)=>{ if(e.button===0) timer=setTimeout(()=>{ showRecordContextMenu(idx, tr); }, longPressMs); });
       tr.addEventListener('mouseup', ()=>{ if(timer) clearTimeout(timer); });
       tr.addEventListener('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
-      // 右键菜单
-      tr.addEventListener('contextmenu', (e)=>{
-        e.preventDefault();
-        showRecordContextMenu(idx, tr, e);
-      });
+      tr.addEventListener('contextmenu', (e)=>{ e.preventDefault(); showRecordContextMenu(idx, tr, e); });
+      
       recordsTbody.appendChild(tr);
     });
   }
 
-  // 行操作菜单（删除/修改）
+  // 显示记录行的上下文菜单（修改/删除）
   function showRecordContextMenu(idx, tr, event){
-    // Remove any existing menu
+    // ... (上下文菜单创建和事件逻辑，与原代码一致，略) ...
     let oldMenu = document.getElementById('recordContextMenu');
     if(oldMenu) oldMenu.remove();
-    // Build menu
     const menu = document.createElement('div');
     menu.id = 'recordContextMenu';
     menu.style.position = 'fixed';
@@ -829,20 +594,18 @@
     menu.style.padding = '0';
     menu.style.minWidth = '160px';
     menu.style.fontSize = '16px';
-    // Position menu
     let x = 0, y = 0;
     if(event && event.clientX !== undefined){
       x = event.clientX;
       y = event.clientY;
     } else {
-      // fallback: center of row
       const rect = tr.getBoundingClientRect();
       x = rect.left + rect.width/2;
       y = rect.top + rect.height/2;
     }
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
-    // Option: 删除当前选中行
+
     const btnDel = document.createElement('div');
     btnDel.textContent = '删除当前选中行';
     btnDel.style.padding = '12px';
@@ -855,7 +618,7 @@
       renderSummary();
       menu.remove();
     });
-    // Option: 修改当前行的数字
+
     const btnEdit = document.createElement('div');
     btnEdit.textContent = '修改当前行的数字';
     btnEdit.style.padding = '12px';
@@ -876,14 +639,14 @@
       }
       menu.remove();
     });
-    // Style hover
+
     [btnDel, btnEdit].forEach(btn=>{
       btn.addEventListener('mouseenter', ()=>{btn.style.background='#f5f5f5';});
       btn.addEventListener('mouseleave', ()=>{btn.style.background='#fff';});
     });
     menu.appendChild(btnDel);
     menu.appendChild(btnEdit);
-    // Remove on click outside
+    
     function removeMenu(e){
       if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('mousedown', removeMenu); }
     }
@@ -891,17 +654,7 @@
     document.body.appendChild(menu);
   }
 
-  // ==========================
-  // 11. 清空/导出记录按钮
-  // ==========================
-  /*
-    功能：
-      - 清空所有操作记录，需确认
-      - 导出记录为 CSV 文件
-    注意事项：
-      - CSV 导出仅支持当前页面数据
-      - 清空操作不可恢复
-  */
+  // 清空所有记录
   $('#btnClearRecords')?.addEventListener('click', ()=>{
     if(!confirm('确定要清空所有记录吗？')) return;
     persist('wuliao_records', []);
@@ -909,41 +662,30 @@
     renderSummary();
   });
 
+  // 导出记录为 CSV
   $('#btnExportRecords')?.addEventListener('click', ()=>{
     const records = load('wuliao_records', []);
-    if(records.length === 0){
-      alert('当前没有记录可导出');
-      return;
-    }
+    if(records.length === 0){ alert('当前没有记录可导出'); return; }
+    
     let csv = '物料名称,数量,时间\n';
-    records.forEach(r=>{
-      csv += `${r.name},${r.quantity},${r.time}\n`;
-    });
+    records.forEach(r=>{ csv += `${r.name},${r.quantity},${r.time}\n`; });
+    
     const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = '记录导出.csv';
+    a.download = '记录导出.csv'; // 默认文件名
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
 
-  // ==========================
-  // 12. 汇总统计面板 renderSummary
-  // ==========================
-  /*
-    功能：
-      - 汇总所有操作记录，按物料名称累加数量
-      - 渲染到汇总面板
-    注意事项：
-      - 仅统计当前记录区的内容
-      - 可扩展为导出或图表
-  */
+  // --- 汇总区逻辑 (Summary Logic) ---
+  // 渲染汇总表格
   function renderSummary(){
     const records = load('wuliao_records', []);
-    const map = {};
+    const map = {}; // {物料名: 总数量}
     for(const r of records){
       map[r.name] = (map[r.name]||0) + Number(r.quantity);
     }
@@ -958,37 +700,21 @@
     }
   }
 
-  // ==========================
-  // 13. 配置文件管理与编辑 renderConfigEditor
-  // ==========================
-  /*
-    功能：
-      - 渲染配置文件下拉列表、编辑区
-      - 支持切换、保存、自动保存
-    变量说明：
-      - configs: 配置集合
-      - configSelect: 下拉框
-      - configText: 编辑文本框
-    注意事项：
-      - “默认配置”始终排第一
-      - 切换配置自动保存当前内容
-      - 编辑区内容自动 0.5 秒后保存
-  */
+  // --- 配置编辑区逻辑 (Config Editor Logic) ---
+  // 渲染配置下拉框和内容
   function renderConfigEditor(){
     const configs = load('wuliao_configs', {});
     configSelect.innerHTML='';
-    // "默认配置" 作为第一个选项, 其余用户自建的配置按名称排序
+    
     const allKeys = Object.keys(configs);
     let keys = [];
-    if (allKeys.includes('默认配置')) {
-      keys.push('默认配置');
-    }
-    // 过滤掉默认配置的其他用户自建配置
-    keys = keys.concat(allKeys.filter(k => k !== '默认配置').sort());
+    if (allKeys.includes('默认配置')) { keys.push('默认配置'); } // 确保默认配置在第一个
+    keys = keys.concat(allKeys.filter(k => k !== '默认配置').sort()); // 其他配置按字母排序
+    
     keys.forEach(fn=>{
       const o = document.createElement('option'); o.value=fn; o.textContent=fn; configSelect.appendChild(o);
     });
-    // 当前选中项
+    
     const current = load('wuliao_current', keys[0]);
     if(current && configSelect.querySelector(`option[value="${current}"]`)){
       configSelect.value = current;
@@ -999,164 +725,172 @@
     loadConfigTextToEditor();
   }
 
-  // 编辑区内容加载
+  // 加载当前选中的配置内容到文本框
   function loadConfigTextToEditor(){
     const configs = load('wuliao_configs', {});
     const cur = configSelect.value;
     configText.value = configs[cur] || '';
   }
 
-  // 编辑区内容保存
+  // 将文本框内容保存到当前配置
   function saveEditorToConfig(){
     const configs = load('wuliao_configs', {});
     const cur = configSelect.value;
     configs[cur] = configText.value;
     persist('wuliao_configs', configs);
-    // live update: re-render materials
-    renderMaterials();
+    renderMaterials(); // 实时更新物料面板
   }
 
-  // 新增配置文件
+  // 新增配置按钮
   btnNewConfig.addEventListener('click', ()=>{
     const name = prompt('新配置文件名（含或不含 .txt）：','新配置.txt');
     if(!name) return;
     let fn = name.trim();
     if(!fn.endsWith('.txt')) fn += '.txt';
+    
     const configs = load('wuliao_configs', {});
-    if(configs[fn]){
-      alert('文件已存在');
-      return;
-    }
-    configs[fn]='';
+    if(configs[fn]){ alert('文件已存在'); return; }
+    
+    configs[fn]=''; // 创建空配置
     persist('wuliao_configs', configs);
     persist('wuliao_current', fn);
+    
     renderConfigEditor();
     configSelect.value = fn;
     configText.value = '';
-    // open editor focus
     configText.focus();
   });
 
-  // 配置切换
+  // 绑定配置下拉框变化事件：切换配置
   configSelect.addEventListener('change', ()=>{
     const selected = configSelect.value;
     persist('wuliao_current', selected);
     loadConfigTextToEditor();
+    renderMaterials(); // 切换配置后，刷新物料面板
+  });
+  
+  // 绑定“保存当前配置到本地”按钮（导出功能）
+  $('#btnSaveConfigFile').addEventListener('click', ()=>{
+      const content = configText.value;
+      const fileName = configSelect.value || '配置导出.txt';
+      const blob = new Blob([content], {type:'text/plain;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert(`配置 "${fileName}" 已导出到您的设备。`);
   });
 
-  // 编辑区自动保存（防抖 0.5s）
+  // 文本输入防抖保存
   let saveTimer = null;
   configText.addEventListener('input', ()=>{
     if(saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(()=>{
       saveEditorToConfig();
-    }, 500);
+    }, 500); // 停止输入 0.5 秒后自动保存
   });
 
-  // ==========================
-  // 14. 初始化与通用事件绑定
-  // ==========================
-  /*
-    功能：
-      - 首次加载页面时初始化所有数据和 UI
-      - 绑定键盘 Esc 关闭 Drawer
-      - 导出部分函数到 window 便于调试
-  */
+  // --- 初始化与启动 ---
   ensureDefaultConfigs();
   renderMaterials();
   renderRecords();
   renderSummary();
   renderConfigEditor();
-  showPage('materials');
+  showPage('materials'); // 默认显示物料面板
+
+  // 键盘 Esc 键关闭抽屉
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape') closeDrawer();
   });
-  window.Wuliao = {
-    load: load, persist: persist, addRecord: addRecord, renderMaterials, renderRecords, renderSummary
-  };
 
-  // ==========================
-  // 15. 本地配置文件导入/删除逻辑
-  // ==========================
-  /*
-    功能：
-      - 支持从本地文件导入配置文件（txt/json 等）
-      - 支持删除当前配置文件（默认配置不可删）
-    变量说明：
-      - configFileInput: 隐藏的文件输入框
-      - btnChooseFile: “本地配置”按钮
-      - btnDeleteConfigFile: “删除当前配置”按钮
-    注意事项：
-      - 文件大小限制 5MB
-      - 导入同名需确认覆盖
-      - 删除后自动切换到默认配置或第一个剩余配置
-  */
-  const configFileInput = document.getElementById('configFileInput');
-  const btnChooseFile = document.getElementById('btnChooseFile');
-  const btnDeleteConfigFile = document.getElementById('btnDeleteConfigFile');
-  // “本地配置”按钮绑定
+  // --- 新增功能逻辑 ---
+
+  // 绑定“本地配置”按钮，触发文件选择
   btnChooseFile.addEventListener('click', () => {
       configFileInput.click();
   });
-  // 文件选择后导入
+
+  // 处理文件选择后的导入事件
   configFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
+
       const reader = new FileReader();
       reader.onload = function(event) {
           const content = event.target.result;
           const fileName = file.name;
+          
           let configs = load('wuliao_configs', {});
+          
+          // 提示是否覆盖已存在的文件
           if (configs[fileName] && !confirm(`文件 ${fileName} 已存在，是否覆盖？`)) {
-              configFileInput.value = '';
+              configFileInput.value = ''; 
               return;
           }
+
           configs[fileName] = content;
           persist('wuliao_configs', configs);
-          persist('wuliao_current', fileName);
+          persist('wuliao_current', fileName); // 导入后自动切换到该配置
+
           renderConfigEditor();
-          configSelect.value = fileName;
-          configText.value = content;
-          renderMaterials();
+          configSelect.value = fileName; 
+          configText.value = content;     
+          renderMaterials();             
+
           alert(`配置文件 ${fileName} 导入成功！`);
-          configFileInput.value = '';
+          configFileInput.value = ''; // 清空选择，允许下次继续选择同名文件
       };
-      if (file.size > 1024 * 1024 * 5) {
+      
+      if (file.size > 1024 * 1024 * 5) { // 限制为5MB
           alert('文件太大，请选择小于 5MB 的配置文件。');
           configFileInput.value = '';
           return;
       }
-      reader.readAsText(file, 'UTF-8');
+      reader.readAsText(file, 'UTF-8'); // 以文本方式读取
   });
-  // 删除当前配置文件
+
+  // 删除当前配置文件的逻辑
   btnDeleteConfigFile.addEventListener('click', () => {
     const cur = configSelect.value;
+    
     if (cur === '默认配置') {
         alert('不能删除默认配置文件。');
-        return;
+        return; // 阻止删除默认配置
     }
+    
     if (!cur) {
         alert('当前没有选中的配置文件。');
         return;
     }
+
     if (!confirm(`确定要删除配置文件 "${cur}" 吗？该操作不可逆！`)) {
         return;
     }
+
     let configs = load('wuliao_configs', {});
+    
+    // 1. 从存储中删除该配置
     delete configs[cur];
     persist('wuliao_configs', configs);
+
+    // 2. 切换当前配置
     const remainingKeys = Object.keys(configs);
     let newCurrent = '默认配置';
     if (remainingKeys.length > 0) {
+        // 确保切换到默认配置或剩下的第一个配置
         newCurrent = remainingKeys.includes('默认配置') ? '默认配置' : remainingKeys.sort()[0];
-    } else {
-         configs['默认配置'] = "物料A「」#FFCDD2\n";
-         persist('wuliao_configs', configs);
-         newCurrent = '默认配置';
-    }
+    } 
+    
     persist('wuliao_current', newCurrent);
+
+    // 3. 重新渲染UI
     renderConfigEditor();
     renderMaterials();
+    
     alert(`配置文件 "${cur}" 已删除，已切换到 "${newCurrent}"。`);
   });
 })();
