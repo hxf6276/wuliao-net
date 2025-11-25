@@ -632,8 +632,30 @@
 
   // Bind config select change
   configSelect.addEventListener('change', ()=>{
-    persist('wuliao_current', configSelect.value);
-    loadConfigTextToEditor();
+    const selected = configSelect.value;
+    if(selected === '网络配置文件'){
+      // Fetch from GitHub immediately
+      fetch('https://raw.githubusercontent.com/hxf6276/wuliao-net/main/configs/default.txt')
+        .then(resp=>{
+          if(!resp.ok) throw new Error('GitHub 文件获取失败');
+          return resp.text();
+        })
+        .then(text=>{
+          const configs = load('wuliao_configs', {});
+          configs['网络配置文件'] = text;
+          persist('wuliao_configs', configs);
+          persist('wuliao_current', '网络配置文件');
+          configText.value = text;
+          renderMaterials();
+        })
+        .catch(err=>{
+          alert('网络配置文件读取失败: ' + err.message);
+        });
+    } else {
+      // Local config
+      persist('wuliao_current', selected);
+      loadConfigTextToEditor();
+    }
   });
 
   // Debounced save
